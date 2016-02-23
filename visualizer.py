@@ -13,23 +13,16 @@ import matplotlib.pyplot as plt
         
 
 def vis_log_reg(base_folder,
-                output_folder,
                 train_cost,
                 train_error,
                 valid_error,
-                window_size,
                 learning_rate):
     print "Visualizer visualize_costs"
         
     if not os.path.isdir(base_folder):
         os.makedirs(base_folder)
     os.chdir(base_folder)
-                
-    if not os.path.isdir(output_folder):
-        os.makedirs(output_folder)
-    os.chdir(output_folder)
-    print('Set output')
-                        
+                                        
     train_cost=numpy.asarray(train_cost)
     train_error=numpy.asarray(train_error)
     valid_error=numpy.asarray(valid_error)
@@ -44,12 +37,9 @@ def vis_log_reg(base_folder,
     # decorative part       
     plt.xlabel('epochs')
     plt.ylabel('error(%)')
-    plt.title(
-        ('WS: %i  LR: %f')
-        % (window_size, learning_rate)
-    )
+    plt.title(('LR: %f') % (learning_rate))
     plt.legend(loc='upper left')
-    plot_name = ('error LR %f WS %i.png')%(learning_rate, window_size)
+    plot_name = ('error LR %f.png')%(learning_rate)
     plt.savefig(plot_name, dpi=200)
     plt.close()
     print('errors visualized')
@@ -61,12 +51,9 @@ def vis_log_reg(base_folder,
     # decorative part      
     plt.xlabel('epochs')
     plt.ylabel('cost')
-    plt.title(
-        ('Window size: %i  Learning rate: %f')
-        % (window_size, learning_rate)
-    )
+    plt.title(('Learning rate: %f') % (learning_rate))
     plt.legend(loc='upper right')
-    plot_name = ('cost LR %f WS %i.png')%(learning_rate, window_size)
+    plot_name = ('cost LR %f.png')%(learning_rate)
     plt.savefig(plot_name, dpi=200)                    
     plt.clf()
     plt.close()

@@ -14,10 +14,8 @@ import theano
 import theano.tensor as T
 
 class BinaryReader(object):
-    def __init__(self, seqs_for_analyse, isTrain,
+    def __init__(self, isTrain,
                  n_features = 75, data_format = 'f'):
-        self.seqs = seqs_for_analyse
-        
         self.n_features = n_features
         self.format = data_format
         self.format_size = struct.calcsize(self.format)
@@ -56,7 +54,7 @@ class BinaryReader(object):
         return (set_x, set_y) 
     
     # read one doc in sequence
-    def read_next_doc(self, algo, rank=1, window=1, divide = False):    
+    def read_next_doc(self):    
        
         feature_array, labels = self.get_sequence()
 
@@ -68,11 +66,13 @@ class BinaryReader(object):
         return (set_x, set_y)
                    
     def init_sequence(self, dataset):
+        files_in_dir = os.listdir(dataset)
+        self.n_files = len(files_in_dir)
         self.sequence_files = []
         
-        for f in self.seqs:
+        for f_index in xrange(len(files_in_dir)):
             # sequence_file - full path to each document
-            sequence_file = dataset+"/"+str(f)+".binary"
+            sequence_file = dataset+"/"+files_in_dir[f_index]
             self.sequence_files.append(sequence_file)
             
     # define current file for reading
@@ -101,9 +101,11 @@ class BinaryReader(object):
                     value = f.read(self.format_size)
                     sample_features.append(struct.unpack(self.format, value)[0])
                 feature_array.append(sample_features)
+            
+            for sample_index in xrange(n_samples):
                 #read label for sample
                 label = f.read(self.format_size)
-                labels.append([struct.unpack(self.format, label)[0]])
+                labels.append(struct.unpack(self.format, label)[0])
             #print(numpy.concatenate((labels, feature_array), axis=1))
             f.close()
         return feature_array, labels
@@ -111,4 +113,5 @@ class BinaryReader(object):
 if __name__ == '__main__':
     names = ['SX56.1703']
     testReader = BinaryReader(names, True)
-    testReader.read_sequence(testReader.sequence_files[0])
+    array, labels = (testReader.read_sequence(testReader.sequence_files[0]))
+    print(labels)

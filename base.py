@@ -29,10 +29,13 @@ def errors(predicted, actual, not_shared = True):
                 'actual should have the same shape as self.y_pred',
                 ('actual', actual.type, 'y_pred', predicted.type)
             )
-
-        # the T.neq operator returns a vector of 0s and 1s, where 1
-        # represents a mistake in prediction
-        return T.neq(predicted, actual)
+        # check if y is of the correct datatype
+        if actual.dtype.startswith('int'):
+            # the T.neq operator returns a vector of 0s and 1s, where 1
+            # represents a mistake in prediction
+            return T.mean(T.neq(predicted, actual))
+        else:
+            raise NotImplementedError()
             
 def turn_into_2_labels(predicted, actual):
     predict = numpy.array([1
