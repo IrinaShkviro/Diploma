@@ -343,7 +343,7 @@ def pretrain_sda_sgd(
             
     return sda
     
-def build_finetune_functions(self, sda, batch_size, learning_rate):
+def build_finetune_functions(sda, batch_size, learning_rate):
 
     index = T.lscalar('index')  # index to a [mini]batch
     train_set_x = T.matrix('train_set_x')
@@ -355,7 +355,7 @@ def build_finetune_functions(self, sda, batch_size, learning_rate):
     # compute list of fine-tuning updates
     updates = [
         (param, param - gparam * learning_rate)
-        for param, gparam in zip(self.params, gparams)
+        for param, gparam in zip(sda.params, gparams)
     ]
 
     train_fn = theano.function(
