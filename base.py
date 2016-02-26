@@ -114,3 +114,28 @@ def errors2(predicted_states, actual_states, pat):
     # the T.neq operator returns a vector of 0s and 1s, where 1
     # represents a mistake in prediction
     return T.neq(theano.shared(predict), theano.shared(actual))
+    
+if __name__ == '__main__':
+    rng = numpy.random.RandomState()
+    n_in = 75
+    n_out = 39
+    theta_values = numpy.asarray(
+            rng.uniform(
+                low=-numpy.sqrt(6. / (n_in + n_out)),
+                high=numpy.sqrt(6. / (n_in + n_out)),
+                size=n_in * n_out + n_out
+            ),
+            dtype=theano.config.floatX
+        )
+    print(theta_values)
+    
+    #rng.seed()
+    theta_values = numpy.asarray(
+            rng.uniform(
+                low=-numpy.sqrt(6. / (n_in + n_out)),
+                high=numpy.sqrt(6. / (n_in + n_out)),
+                size=n_in * n_out + n_out
+            ),
+            dtype=theano.config.floatX
+        )
+    print(theta_values)

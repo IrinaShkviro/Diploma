@@ -16,12 +16,18 @@ def vis_log_reg(base_folder,
                 train_cost,
                 train_error,
                 valid_error,
-                learning_rate):
+                learning_rate,
+                attempt):
     print "Visualizer visualize_costs"
         
     if not os.path.isdir(base_folder):
         os.makedirs(base_folder)
     os.chdir(base_folder)
+    
+    lr_folder = ('LR %f') % (learning_rate)
+    if not os.path.isdir(lr_folder):
+        os.makedirs(lr_folder)
+    os.chdir(lr_folder)
                                         
     train_cost=numpy.asarray(train_cost)
     train_error=numpy.asarray(train_error)
@@ -39,7 +45,7 @@ def vis_log_reg(base_folder,
     plt.ylabel('error(%)')
     plt.title(('LR: %f') % (learning_rate))
     plt.legend(loc='upper left')
-    plot_name = ('error LR %f.png')%(learning_rate)
+    plot_name = ('error reg_index %i.png')%(attempt)
     plt.savefig(plot_name, dpi=200)
     plt.close()
     print('errors visualized')
@@ -53,7 +59,7 @@ def vis_log_reg(base_folder,
     plt.ylabel('cost')
     plt.title(('Learning rate: %f') % (learning_rate))
     plt.legend(loc='upper right')
-    plot_name = ('cost LR %f.png')%(learning_rate)
+    plot_name = ('cost reg_index %i.png')%(attempt)
     plt.savefig(plot_name, dpi=200)                    
     plt.clf()
     plt.close()
@@ -64,7 +70,6 @@ def vis_log_reg(base_folder,
 
 def visualize_pretraining(train_cost,
                           valid_error,
-                          window_size,
                           learning_rate,
                           corruption_level,
                           n_hidden,
@@ -78,12 +83,7 @@ def visualize_pretraining(train_cost,
         if not os.path.isdir(datasets_folder):
             os.makedirs(datasets_folder)
         os.chdir(datasets_folder)
-        
-        example_folder = ('WS %f')%(window_size)
-        if not os.path.isdir(example_folder):
-            os.makedirs(example_folder)
-        os.chdir(example_folder)
-                        
+                                
         train_cost=numpy.asarray(train_cost)
         valid_error=numpy.asarray(valid_error)
         
@@ -115,7 +115,6 @@ def visualize_pretraining(train_cost,
         plt.savefig(plot_name, dpi=200)
         plt.close()
         
-        os.chdir('../')
         os.chdir('../')
         os.chdir('../')
         

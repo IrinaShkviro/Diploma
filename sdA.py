@@ -16,33 +16,25 @@ import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from hidden_layer import HiddenLayer
-from da import dA
+from hiddenLayer import HiddenLayer
+from dA import dA
 from visualizer import visualize_pretraining
-from cg import pretrain_sda_cg
-from sgd import pretrain_sda_sgd
-from log_reg import LogisticRegression
+#from cg import pretrain_sda_cg
+from sgd import pretrain_sda_sgd, finetune_log_layer_sgd
+from logisticRegression import LogisticRegression
+from binaryReader import BinaryReader
 
 theano.config.exception_verbosity='high'
 
 class SdA(object):
-    """Stacked denoising auto-encoder class (SdA)
-    A stacked denoising autoencoder model is obtained by stacking several
-    dAs. The hidden layer of the dA at layer `i` becomes the input of
-    the dA at layer `i+1`. The first layer dA gets as input the input of
-    the SdA, and the hidden layer of the last dA represents the output.
-    Note that after pretraining, the SdA is dealt with as a normal MLP,
-    the dAs are only used to initialize the weights.
-    """
-
     def __init__(
         self,
         numpy_rng,
         n_ins,
+        n_outs,
         hidden_layers_sizes,
         corruption_levels=[0.1, 0.1],
-        theano_rng=None,
-        n_outs=7
+        theano_rng=None
     ):
         """ This class is made to support a variable number of layers.
         :type numpy_rng: numpy.random.RandomState
@@ -71,24 +63,13 @@ class SdA(object):
         self.n_outs=n_outs
         
         # allocate symbolic variables for the data
-        self.x = T.vector('x')  # the data is presented as rasterized images
-        self.y = T.iscalar('y')  # the labels are presented as 1D vector of
-                                 # [int] labels
+        self.x = T.matrix('x')
+        self.y = T.ivector('y')
 
         assert self.n_layers > 0
 
         if not theano_rng:
             theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
-
-        # The SdA is an MLP, for which all weights of intermediate layers
-        # are shared with a different denoising autoencoders
-        # We will first construct the SdA as a deep multilayer perceptron,
-        # and when constructing each sigmoidal layer we also construct a
-        # denoising autoencoder that shares weights with that layer
-        # During pretraining we will train these autoencoders (which will
-        # lead to chainging the weights of the MLP as well)
-        # During finetunining we will finish training the SdA by doing
-        # stochastich gradient descent on the MLP
 
         for i in xrange(self.n_layers):
             # construct the sigmoidal layer
@@ -117,15 +98,9 @@ class SdA(object):
             )
             # add the layer to our list of layers
             self.sigmoid_layers.append(sigmoid_layer)
-            # its arguably a philosophical question...
-            # but we are going to only declare that the parameters of the
-            # sigmoid_layers are parameters of the StackedDAA
-            # the visible biases in the dA are parameters of those
-            # dA, but not the SdA
             self.params.append(sigmoid_layer.theta)
 
-            # Construct a denoising autoencoder that shared weights with this
-            # layer
+            # Construct a denoising autoencoder that shared weights with this layer
             dA_layer = dA(
                 numpy_rng=numpy_rng,
                 theano_rng=theano_rng,
@@ -134,8 +109,10 @@ class SdA(object):
                 n_hidden=hidden_layers_sizes[i],
                 theta=sigmoid_layer.theta
             )
+            
             self.dA_layers.append(dA_layer)
-        sda_input = T.vector('sda_input')  # the data is presented as rasterized images
+
+        sda_input = T.matrix('sda_input')
         self.da_layers_output_size = hidden_layers_sizes[-1]
         self.get_da_output = theano.function(
             inputs=[sda_input],
@@ -146,55 +123,43 @@ class SdA(object):
         )
         
         self.logLayer = LogisticRegression(
+            rng = numpy.random.RandomState(),
             input=self.sigmoid_layers[-1].output,
             n_in=hidden_layers_sizes[-1],
             n_out=n_outs
         )
-                
-    def set_hmm2(self, hmm2):
-        self.hmm2 = hmm2
-        
-    def set_hmm1(self, hmm1):
-        self.hmm1 = hmm1
-        
-def pretrain_SdA(train_names,
-                 valid_names,
-                 read_window,
-                 read_algo,
-                 read_rank,                 
-                 window_size,
-                 corruption_levels,
+        self.params.extend(self.logLayer.params)
+        self.finetune_cost = self.logLayer.negative_log_likelihood(self.y)
+        self.errors = self.logLayer.errors(self.y)
+                        
+def pretrain_SdA(corruption_levels,
                  pretraining_epochs,
                  pretraining_pat_epochs,
                  pretrain_lr,
                  pretrain_algo,
                  hidden_layers_sizes,
                  output_folder,
-                 base_folder):
+                 base_folder,
+                 n_features,
+                 n_classes,
+                 batch_size,
+                 train_seq_len,
+                 test_seq_len):
     """
-    Demonstrates how to train and test a stochastic denoising autoencoder.
-    This is demonstrated on ICHI.
     :type pretraining_epochs: int
     :param pretraining_epochs: number of epoch to do pretraining
-    :type n_iter: int
-    :param n_iter: maximal number of iterations ot run the optimizer
-    :type datasets: array
-    :param datasets: [train_set, valid_set, test_set]
-    
+   
     :type output_folder: string
     :param output_folder: folder for costand error graphics with results
-    """
-
-    n_out = 7  # number of output units
-    
-    # numpy random generator
-    numpy_rng = numpy.random.RandomState(89677)
+    """    
     # construct the stacked denoising autoencoder class
     sda = SdA(
-        numpy_rng=numpy_rng,
-        n_ins=window_size,
-        hidden_layers_sizes=hidden_layers_sizes,
-        n_outs=n_out
+        numpy_rng = numpy.random.RandomState(),
+        n_ins = n_features,
+        n_outs = n_classes,
+        hidden_layers_sizes = hidden_layers_sizes,
+        corruption_levels = corruption_levels,
+        theano_rng = None
     )
         
     #########################
@@ -204,16 +169,13 @@ def pretrain_SdA(train_names,
     if (pretrain_algo == "sgd"):
         pretrained_sda = pretrain_sda_sgd(
             sda = sda,
-            train_names = train_names,
-            valid_names = valid_names,
-            read_window = read_window,
-            read_algo = read_algo,
-            read_rank = read_rank,
-            window_size = window_size,
+            pretrain_lr = pretrain_lr,
+            corruption_levels = corruption_levels,
             global_epochs = pretraining_epochs,
             pat_epochs = pretraining_pat_epochs,
-            pretrain_lr = pretrain_lr,
-            corruption_levels = corruption_levels
+            batch_size = batch_size,
+            train_seq_len = train_seq_len,
+            test_seq_len = test_seq_len
         )
     else:
         pretrained_sda = pretrain_sda_cg(
@@ -230,7 +192,6 @@ def pretrain_SdA(train_names,
         visualize_pretraining(
             train_cost = pretrained_sda.dA_layers[i].train_cost_array,
             valid_error = pretrained_sda.dA_layers[i].valid_error_array,
-            window_size = window_size,
             learning_rate = pretrain_lr,
             corruption_level = corruption_levels[i],
             n_hidden = sda.dA_layers[i].n_hidden,
@@ -241,3 +202,94 @@ def pretrain_SdA(train_names,
     
     gc.collect()    
     return sda
+
+def finetune_sda(pretrained_sda,
+                 batch_size,
+                 finetune_lr,
+                 finetune_epochs,
+                 finetune_pat_epochs,
+                 train_seq_len,
+                 test_seq_len,
+                 finetune_algo):
+    # train logistic regression layer
+    if finetune_algo == 'sgd':    
+        finetuned_sda = finetune_log_layer_sgd(
+            sda = pretrained_sda,
+            batch_size = batch_size,
+            finetune_lr = finetune_lr,
+            global_epochs = finetune_epochs,
+            pat_epochs = finetune_pat_epochs,
+            train_seq_len = train_seq_len,
+            test_seq_len = test_seq_len
+        )
+        
+    else:        
+        finetuned_sda = pretrained_sda
+    return finetuned_sda
+        
+def train_sda(corruption_levels,
+              pretraining_epochs,
+              pretraining_pat_epochs,
+              pretrain_lr,
+              hidden_layer_sizes,
+              pretrain_algo,
+              n_features,
+              n_classes,
+              batch_size,
+              train_seq_len,
+              test_seq_len,
+              finetune_lr,
+              finetune_epochs,
+              finetune_pat_epochs,
+              finetune_algo
+              ):
+    base_folder = 'sda_log_reg'
+    pretrained_sda = pretrain_SdA(
+        corruption_levels = corruption_levels,
+        pretraining_epochs = pretraining_epochs,
+        pretraining_pat_epochs = pretraining_pat_epochs,
+        pretrain_lr = pretrain_lr,        
+        pretrain_algo = pretrain_algo,
+        hidden_layers_sizes = hidden_layer_sizes,
+        output_folder = ('pretrain_sda_%s')%(pretrain_algo),
+        base_folder = base_folder,
+        n_features = n_features,
+        n_classes = n_classes,
+        batch_size = batch_size,
+        train_seq_len = train_seq_len,
+        test_seq_len = test_seq_len
+    )
+    # train logistic regression layer
+    finetuned_sda = finetune_sda(
+        pretrained_sda = pretrained_sda,
+        batch_size = batch_size,
+        finetune_lr = finetune_lr,
+        finetune_epochs = finetune_epochs,
+        finetune_pat_epochs = finetune_pat_epochs,
+        train_seq_len = train_seq_len,
+        test_seq_len = test_seq_len,
+        finetune_algo = finetune_algo
+    )
+    return finetuned_sda
+    
+def test_sda(sda, test_seq_len = 1):
+    
+    test_model = theano.function(
+        inputs=[sda.x, sda.y],
+        outputs=[sda.errors]
+    )   
+    test_reader = BinaryReader(
+        isTrain=False,
+        len_seqs=test_seq_len
+    )
+    # compute zero-one loss on test set
+    test_error_array = [] 
+    for test_pat in xrange(test_reader.n_files):
+        test_features, test_labels = test_reader.read_several()
+        test_error_array.append(test_model(
+            test_features.get_value(borrow=True),
+            test_labels.eval()
+        ))
+    gc.collect()
+        
+    return test_error_array

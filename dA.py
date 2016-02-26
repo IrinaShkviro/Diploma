@@ -15,19 +15,11 @@ import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 
-from ichi_reader import ICHISeqDataReader
 #from MyVisualizer import visualize_da
-from sgd import train_da_sgd
-from cg import train_da_cg
+#from sgd import train_da_sgd
+#from cg import train_da_cg
 
 class dA(object):
-    """Denoising Auto-Encoder class (dA)
-
-    A denoising autoencoders tries to reconstruct the input from a corrupted
-    version of it by projecting it first in a latent space and reprojecting
-    it afterwards back in the input space.
-    """
-
     def __init__(
         self,
         numpy_rng,
@@ -39,50 +31,12 @@ class dA(object):
         bvis=None
     ):
         """
-        Initialize the dA class by specifying the number of visible units (the
-        dimension d of the input), the number of hidden units (the dimension
-        d' of the latent or hidden space) and the corruption level. The
-        constructor also receives symbolic variables for the input, weights and
-        bias. Such a symbolic variables are useful when, for example the input
-        is the result of some computations, or when weights are shared between
-        the dA and an MLP layer. When dealing with SdAs this always happens,
-        the dA on layer 2 gets as input the output of the dA on layer 1,
-        and the weights of the dA are used in the second stage of training
-        to construct an MLP.
-
         :type numpy_rng: numpy.random.RandomState
         :param numpy_rng: number random generator used to generate weights
 
         :type theano_rng: theano.tensor.shared_randomstreams.RandomStreams
         :param theano_rng: Theano random generator; if None is given one is
                      generated based on a seed drawn from `rng`
-
-        :type input: theano.tensor.TensorType
-        :param input: a symbolic description of the input or None for
-                      standalone dA
-
-        :type n_visible: int
-        :param n_visible: number of visible units
-
-        :type n_hidden: int
-        :param n_hidden:  number of hidden units
-
-        :type W: theano.tensor.TensorType
-        :param W: Theano variable pointing to a set of weights that should be
-                  shared belong the dA and another architecture; if dA should
-                  be standalone set this to None
-
-        :type bhid: theano.tensor.TensorType
-        :param bhid: Theano variable pointing to a set of biases values (for
-                     hidden units) that should be shared belong dA and another
-                     architecture; if dA should be standalone set this to None
-
-        :type bvis: theano.tensor.TensorType
-        :param bvis: Theano variable pointing to a set of biases values (for
-                     visible units) that should be shared belong dA and another
-                     architecture; if dA should be standalone set this to None
-
-
         """
         self.n_visible = n_visible
         self.n_hidden = n_hidden
@@ -96,15 +50,16 @@ class dA(object):
         # while b is a vector of n_out elements, making theta a vector of
         # n_visible*n_hidden + n_hidden elements
         if not theta:
-            theta = theano.shared(
-                value=numpy.asarray(
-                    numpy_rng.uniform(
-                        low=-4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
-                        high=4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
-                        size=(n_visible * n_hidden + n_hidden)
-                    ),
-                    dtype=theano.config.floatX
+            theta_values = numpy.asarray(
+                numpy_rng.uniform(
+                    low=-4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
+                    high=4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
+                    size=(n_visible * n_hidden + n_hidden)
                 ),
+                dtype=theano.config.floatX
+            )
+            theta = theano.shared(
+                value=theta_values,
                 name='theta',
                 borrow=True
             )
@@ -116,11 +71,12 @@ class dA(object):
         bhid = self.theta[n_visible * n_hidden:n_visible * n_hidden + n_hidden]
 
         if not bvis:
+            bvis_values = numpy.asarray(
+                numpy_rng.uniform(self.n_visible,),
+                dtype=theano.config.floatX
+            )
             bvis = theano.shared(
-                value=numpy.zeros(
-                    (self.n_visible,),
-                    dtype=theano.config.floatX
-                ),
+                value=bvis_values,
                 borrow=True
             )
 
@@ -134,7 +90,7 @@ class dA(object):
         self.theano_rng = theano_rng
         # if no input is given, generate a variable representing the input
         if input is None:
-            self.x = T.vector(name='input')
+            self.x = T.matrix(name='input')
         else:
             self.x = input
 
@@ -145,27 +101,8 @@ class dA(object):
         self.epoch=0
 
     def get_corrupted_input(self, input, corruption_level):
-        """This function keeps ``1-corruption_level`` entries of the inputs the
-        same and zero-out randomly selected subset of size ``coruption_level``
-        Note : first argument of theano.rng.binomial is the shape(size) of
-               random numbers that it should produce
-               second argument is the number of trials
-               third argument is the probability of success of any trial
-
-                this will produce an array of 0s and 1s where 1 has a
-                probability of 1 - ``corruption_level`` and 0 with
-                ``corruption_level``
-
-                The binomial function return int64 data type by
-                default.  int64 multiplicated by the input
-                type(floatX) always return float64.  To keep all data
-                in floatX when floatX is float32, we set the dtype of
-                the binomial to floatX. As in our case the value of
-                the binomial is always 0 or 1, this don't change the
-                result. This is needed to allow the gpu to work
-                correctly as it only support float32 for now.
-
-        """
+        """ This function keeps ``1-corruption_level`` entries of the inputs the
+        same and zero-out randomly selected subset of size ``coruption_level`` """
         return self.theano_rng.binomial(
             size=input.shape,
             n=1,

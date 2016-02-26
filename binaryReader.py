@@ -14,18 +14,27 @@ import theano
 import theano.tensor as T
 
 class BinaryReader(object):
-    def __init__(self, isTrain,
-                 n_features = 75, data_format = 'f'):
+    def __init__(self,
+                 isTrain,
+                 len_seqs=1,
+                 n_features = 75,
+                 data_format = 'f'):
+        """
+        :type len_seqs: int
+        :param len_seqs: count of files that will be read together (like the one)
+        """
         self.n_features = n_features
         self.format = data_format
         self.format_size = struct.calcsize(self.format)
                 
         self.sequence_index = 0
+        self.isTrain = isTrain
+        self.len_seqs = len_seqs
         # path to folder with data
         if isTrain:
-            dataset = './Data/phones39/train' 
+            dataset = './data/phones39/train' 
         else:
-            dataset = './Data/phones39/test' 
+            dataset = './data/phones39/test' 
         self.init_sequence(dataset)
     
     # read all docs in sequence
@@ -64,10 +73,34 @@ class BinaryReader(object):
                                                    dtype=theano.config.floatX),
                                          borrow=True), 'int32')       
         return (set_x, set_y)
+        
+    def read_several(self):
+        feature_array, labels = self.get_sequence()
+
+        data_features = feature_array
+        data_labels = labels
+        
+        for t in xrange(self.len_seqs - 1):
+            #read current file
+            feature_array, labels = self.get_sequence()
+            
+            # concatenate data in current file with data in prev files in one array
+            data_features = numpy.concatenate((data_features, feature_array))
+            data_labels = numpy.concatenate((data_labels, labels))                           
+            gc.collect()
+        
+        set_features = theano.shared(numpy.asarray(data_features,
+                                                   dtype=theano.config.floatX),
+                                     borrow=True)
+        set_labels = T.cast(theano.shared(numpy.asarray(data_labels,
+                                                   dtype=theano.config.floatX),
+                                     borrow=True), 'int32')
+        
+        return (set_features, set_labels) 
                    
     def init_sequence(self, dataset):
         files_in_dir = os.listdir(dataset)
-        self.n_files = len(files_in_dir)
+        self.n_files = len(files_in_dir)/self.len_seqs
         self.sequence_files = []
         
         for f_index in xrange(len(files_in_dir)):
@@ -80,7 +113,8 @@ class BinaryReader(object):
         
         if self.sequence_index>=len(self.sequence_files):
             self.sequence_index = 0
-            
+        if self.isTrain and self.sequence_index % 500 == 0:
+            print('train file number ', self.sequence_index)
         sequence_file = self.sequence_files[self.sequence_index]
         self.sequence_index = self.sequence_index+1
         return self.read_sequence(sequence_file)

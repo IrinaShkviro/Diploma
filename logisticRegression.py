@@ -33,6 +33,7 @@ class LogisticRegression(object):
         # W gets the shape (n_in, n_out),
         # while b is a vector of n_out elements
         # making theta a vector of n_in*n_out + n_out elements
+        rng.seed()
         theta_values = numpy.asarray(
             rng.uniform(
                 low=-numpy.sqrt(6. / (n_in + n_out)),
@@ -74,6 +75,7 @@ class LogisticRegression(object):
         self.train_cost_array = []
         self.train_error_array = []
         self.epoch = 0
+        self.validation = numpy.inf
         
     def print_log_reg_types(self):
         print(self.W.type(), 'W')
@@ -121,26 +123,35 @@ class LogisticRegression(object):
         )
         
 def train_log_reg(learning_rate,
-                 n_epochs,
+                 pat_epochs,
                  base_folder,
+                 n_features,
+                 n_classes,
                  train_algo = 'sgd',
-                 batch_size = 1):
+                 batch_size = 1,
+                 attempt = 0,
+                 global_epochs = 1,
+                 train_seq_len = 20,
+                 test_seq_len = 40):
     
     x = T.matrix('x')
-    rng = numpy.random.RandomState(1234)
+    rng = numpy.random.RandomState()
     classifier = LogisticRegression(
-        rng=rng,
-        input=x,
-        n_in=75,
-        n_out=39
+        rng = rng,
+        input = x,
+        n_in = n_features,
+        n_out = n_classes
     )
     
     if (train_algo == 'sgd'):
         trained_classifier = train_logistic_sgd(
             learning_rate = learning_rate,
-            n_epochs = n_epochs,
+            pat_epochs = pat_epochs,
             classifier = classifier,
-            batch_size = batch_size
+            batch_size = batch_size,
+            global_epochs = global_epochs,
+            train_seq_len = train_seq_len,
+            test_seq_len = test_seq_len
         )
     else:
         trained_classifier = train_logistic_cg(
@@ -153,14 +164,17 @@ def train_log_reg(learning_rate,
         train_cost = classifier.train_cost_array,
         train_error = classifier.train_error_array,
         valid_error = classifier.valid_error_array,
-        learning_rate = learning_rate
+        learning_rate = learning_rate,
+        attempt = attempt
     )
     
     return trained_classifier
     
-def test_log_reg(classifier):
-    
-    test_reader = BinaryReader(isTrain=False)    
+def test_log_reg(classifier, test_seq_len):    
+    test_reader = BinaryReader(
+        isTrain=False,
+        len_seqs = test_seq_len
+    )    
     y = T.ivector('y')
     
     # compile a predictor function
@@ -172,34 +186,10 @@ def test_log_reg(classifier):
     test_error_array = []    
     
     for pat_num in xrange(test_reader.n_files):
-        test_set_x, test_set_y = test_reader.read_next_doc()        
+        test_set_x, test_set_y = test_reader.read_several()        
         test_error_array.append(predict_model(
             test_set_x.get_value(borrow=True),
             test_set_y.eval()
         ))
      
     return test_error_array
-        
-def test_all_params():  
-    learning_rate = 0.0001
-    
-    n_epochs = 2
-    train_algo = 'sgd'
-    
-    trained_classifier = train_log_reg(
-        learning_rate=learning_rate,
-        n_epochs=n_epochs,
-        base_folder=('log_reg_%s')%(train_algo),
-        train_algo = 'sgd',
-        batch_size = 1
-    )
-    test_errors = test_log_reg(
-        classifier = trained_classifier
-    )
-    print('errors:', test_errors)
-    print('mean value of error: ', numpy.round(numpy.mean(test_errors), 6))
-    print('min value of error: ', numpy.round(numpy.amin(test_errors), 6))
-    print('max value of error: ', numpy.round(numpy.amax(test_errors), 6))    
-
-if __name__ == '__main__':
-    test_all_params()
