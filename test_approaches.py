@@ -5,6 +5,13 @@ Created on Fri Feb 26 18:45:48 2016
 @author: irina
 """
 
+#set config
+'''THEANO_FLAGS='floatX=float32, device=gpu?, force_device=False, warn_float64=warn,\
+    allow_gc=True, openmp=True, cast_policy=numpy+floatX, int_division=floatX,\
+    mode=FAST_RUN, profile=False, nvcc.fastmath=True, numpy.seterr_over=warn,\
+    numpy.seterr_under=warn, numpy.seterr_invalid=warn, exception_verbosity=low,\
+    cmodule.compilation_warning=True, cmodule.preload_cache=True'
+'''
 import numpy
 import pickle
 
@@ -48,14 +55,14 @@ def train_one_classifier():
     print('max value of error: ', numpy.round(numpy.amax(test_errors), 6))
     
 def train_many_regs():
-    learning_rate = 0.001
-    pat_epochs = 1
+    learning_rate = 0.01
+    pat_epochs = 20
     train_algo = 'sgd'
-    batch_size = 10,
-    n_attempts = 2
+    batch_size = 128
+    n_attempts = 10
     global_epochs = 1
-    train_seq_len = 20,
-    test_seq_len = 40
+    train_seq_len = 128
+    test_seq_len = 128
     best_validation = numpy.inf
     
     # 2nd approach
@@ -141,4 +148,4 @@ def train_sda_with_log_layer():
 
 
 if __name__ == '__main__':
-    train_sda_with_log_layer()
+    train_many_regs()

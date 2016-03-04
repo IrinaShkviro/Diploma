@@ -17,14 +17,15 @@ def vis_log_reg(base_folder,
                 train_error,
                 valid_error,
                 learning_rate,
-                attempt):
+                attempt,
+                batch_size):
     print "Visualizer visualize_costs"
         
     if not os.path.isdir(base_folder):
         os.makedirs(base_folder)
     os.chdir(base_folder)
     
-    lr_folder = ('LR %f') % (learning_rate)
+    lr_folder = ('LR %f BS %i') % (learning_rate, batch_size)
     if not os.path.isdir(lr_folder):
         os.makedirs(lr_folder)
     os.chdir(lr_folder)

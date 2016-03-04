@@ -89,6 +89,7 @@ class BinaryReader(object):
             data_labels = numpy.concatenate((data_labels, labels))                           
             gc.collect()
         
+        print('read several samples: ', len(data_labels))
         set_features = theano.shared(numpy.asarray(data_features,
                                                    dtype=theano.config.floatX),
                                      borrow=True)
@@ -100,7 +101,8 @@ class BinaryReader(object):
                    
     def init_sequence(self, dataset):
         files_in_dir = os.listdir(dataset)
-        self.n_files = len(files_in_dir)/self.len_seqs
+        # how many times we will read_several() from reader to read aall data in the set
+        self.n_files = len(files_in_dir)/self.len_seqs + 1
         self.sequence_files = []
         
         for f_index in xrange(len(files_in_dir)):
@@ -113,8 +115,6 @@ class BinaryReader(object):
         
         if self.sequence_index>=len(self.sequence_files):
             self.sequence_index = 0
-        if self.isTrain and self.sequence_index % 500 == 0:
-            print('train file number ', self.sequence_index)
         sequence_file = self.sequence_files[self.sequence_index]
         self.sequence_index = self.sequence_index+1
         return self.read_sequence(sequence_file)

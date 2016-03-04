@@ -128,7 +128,7 @@ class SdA(object):
             n_in=hidden_layers_sizes[-1],
             n_out=n_outs
         )
-        self.params.extend(self.logLayer.params)
+        #self.params.extend(self.logLayer.params)
         self.finetune_cost = self.logLayer.negative_log_likelihood(self.y)
         self.errors = self.logLayer.errors(self.y)
                         
@@ -188,7 +188,7 @@ def pretrain_SdA(corruption_levels,
             read_window = read_window
         )
                              
-    for i in xrange(sda.n_layers):
+    '''for i in xrange(sda.n_layers):
         visualize_pretraining(
             train_cost = pretrained_sda.dA_layers[i].train_cost_array,
             valid_error = pretrained_sda.dA_layers[i].valid_error_array,
@@ -199,7 +199,7 @@ def pretrain_SdA(corruption_levels,
             datasets_folder = output_folder,
             base_folder = base_folder
         )
-    
+    '''
     gc.collect()    
     return sda
 

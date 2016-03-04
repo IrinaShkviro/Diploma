@@ -24,13 +24,13 @@ class HiddenLayer(object):
         rng.seed()
         if theta is None:
             theta_values = numpy.asarray(
-                    rng.uniform(
-                        low=-4 * numpy.sqrt(6. / (n_out + n_in + 1)),
-                        high=4 * numpy.sqrt(6. / (n_out + n_in + 1)),
-                        size=(n_in * n_out + n_out)
-                    ),
-                    dtype=theano.config.floatX
-                )
+                rng.uniform(
+                    low=-4 * numpy.sqrt(6. / (n_out + n_in + 1)),
+                    high=4 * numpy.sqrt(6. / (n_out + n_in + 1)),
+                    size=(n_in * n_out + n_out)
+                ),
+                dtype=theano.config.floatX
+            )
             theta = theano.shared(
                 value=theta_values,
                 name='theta',

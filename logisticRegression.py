@@ -13,7 +13,7 @@ import theano
 import theano.tensor as T
 
 from binaryReader import BinaryReader
-from sgd import train_logistic_sgd
+from sgd_with_stopping import train_logistic_sgd
 #from cg import train_logistic_cg
 from base import errors
 from visualizer import vis_log_reg
@@ -165,7 +165,8 @@ def train_log_reg(learning_rate,
         train_error = classifier.train_error_array,
         valid_error = classifier.valid_error_array,
         learning_rate = learning_rate,
-        attempt = attempt
+        attempt = attempt,
+        batch_size = batch_size
     )
     
     return trained_classifier

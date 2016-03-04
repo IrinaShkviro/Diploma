@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Feb 19 12:21:59 2016
+Created on Thu Mar 03 16:08:00 2016
 
 @author: irina
 """
@@ -94,16 +94,22 @@ def train_logistic_sgd(
     )
     best_validation_loss = numpy.inf
 
-    iter = 0    
     train_model, validate_model = training_functions_log_reg_sgd(
         classifier = classifier,
         batch_size = batch_size
     )
-      
-    validation_frequency = 5000 * pat_epochs * global_epochs
     
-    for global_index in xrange(global_epochs):
-        for pat_num in xrange (train_reader.n_files):
+    n_failures = 0
+    done_global_loop = False
+    max_failures = train_reader.n_files
+    global_index = 0    
+    
+    while (global_index < global_epochs) and (not done_global_loop):
+        global_index = global_index + 1
+        pat_num = 0
+        while (pat_num < train_reader.n_files) and (not done_global_loop):
+            pat_num = pat_num + 1
+            done_looping = False
             pat_epoch = 0
             # go through the training set
             train_features, train_labels = train_reader.read_several()
@@ -111,17 +117,30 @@ def train_logistic_sgd(
             train_labels = train_labels.eval()
             n_train_batches = train_features.shape[0] // batch_size
             
-            while (pat_epoch < pat_epochs):
+            iter = 0
+            # early-stopping parameters
+            improvement_threshold = 0.995  # a relative improvement of this much is
+                                           # considered significant
+            n_local_failures = 0
+            max_local_failures = 3
+            
+            validation_frequency = n_train_batches // max_local_failures
+            validation_increase = 0.2
+
+            while (pat_epoch < pat_epochs) and (not done_looping):
+                classifier.epoch = classifier.epoch + 1
+                pat_epoch = pat_epoch + 1
+                
                 cur_train_cost =[]
                 cur_train_error = []
-                for index in xrange(n_train_batches):            
+                for minibatch_index in xrange(n_train_batches):
                     mean_cost, mean_error = train_model(
-                        index = index,
+                        index = minibatch_index,
                         train_set_x = train_features,
                         train_set_y = train_labels,
                         lr = learning_rate
                     )
-                    # iteration number
+                    # iteration number: batch's number that we train now
                     iter = iter + 1
                         
                     cur_train_cost.append(mean_cost)
@@ -144,18 +163,33 @@ def train_logistic_sgd(
             
                         this_validation_loss = float(numpy.mean(valid_error_array))*100                 
                         classifier.valid_error_array.append([])
-                        classifier.valid_error_array[-1].append(classifier.epoch + float(index)/n_train_batches)
+                        classifier.valid_error_array[-1].append(classifier.epoch + float(minibatch_index)/n_train_batches)
                         classifier.valid_error_array[-1].append(this_validation_loss)
                
                         # if we got the best validation score until now
                         if this_validation_loss < best_validation_loss:
                               best_validation_loss = this_validation_loss
+                              n_failures = 0
+                              n_local_failures = 0                              
+                              
+                              #improve patience if loss improvement is good enough
+                              if this_validation_loss < best_validation_loss *  \
+                              improvement_threshold:
+                                  validation_frequency = int(validation_frequency * \
+                                      validation_increase)
+                                  max_local_failures = n_train_batches // \
+                                      validation_frequency
+                        else:
+                            n_local_failures = n_local_failures + 1
+                            if n_local_failures > max_local_failures:
+                                done_looping = True
+                                n_failures = n_failures + 1
+                                if n_failures > max_failures:
+                                    done_global_loop = True
+                                break
                         
                         gc.collect()
-                                   
-                classifier.epoch = classifier.epoch + 1
-                pat_epoch = pat_epoch + 1
-                
+                                                                   
                 classifier.train_cost_array.append([])
                 classifier.train_cost_array[-1].append(float(classifier.epoch))
                 classifier.train_cost_array[-1].append(float(numpy.mean(cur_train_cost)))
@@ -165,10 +199,9 @@ def train_logistic_sgd(
                 classifier.train_error_array[-1].append(float(classifier.epoch))
                 classifier.train_error_array[-1].append(float(numpy.mean(cur_train_error)*100))
                 cur_train_error =[]
-                        
+                
             gc.collect()
         
-    print('last_iter: ', iter)
     valid_reader = BinaryReader(
         isTrain=False,
         len_seqs=test_seq_len
@@ -399,7 +432,7 @@ def finetune_log_layer_sgd(
     )
     
     iter = 0
-    validation_frequency = 500*pat_epochs*global_epochs
+    validation_frequency = 5000*pat_epochs*global_epochs
 
     for global_epoch in xrange(global_epochs):
         train_reader = BinaryReader(
