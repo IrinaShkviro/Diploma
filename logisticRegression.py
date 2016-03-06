@@ -189,8 +189,14 @@ def test_log_reg(classifier, test_seq_len):
     for pat_num in xrange(test_reader.n_files):
         test_set_x, test_set_y = test_reader.read_several()        
         test_error_array.append(predict_model(
-            test_set_x.get_value(borrow=True),
-            test_set_y.eval()
+            test_set_x.get_value(
+                borrow=True,
+                return_internal_type=True
+            ),
+            test_set_y.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
         ))
      
     return test_error_array

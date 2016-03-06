@@ -287,8 +287,14 @@ def test_sda(sda, test_seq_len = 1):
     for test_pat in xrange(test_reader.n_files):
         test_features, test_labels = test_reader.read_several()
         test_error_array.append(test_model(
-            test_features.get_value(borrow=True),
-            test_labels.eval()
+            test_features.get_value(
+                borrow=True,
+                return_internal_type=True
+            ),
+            test_labels.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
         ))
     gc.collect()
         

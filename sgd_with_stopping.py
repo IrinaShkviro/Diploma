@@ -113,8 +113,14 @@ def train_logistic_sgd(
             pat_epoch = 0
             # go through the training set
             train_features, train_labels = train_reader.read_several()
-            train_features = train_features.get_value(borrow=True)
-            train_labels = train_labels.eval()
+            train_features = train_features.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
+            train_labels = train_labels.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
             n_train_batches = train_features.shape[0] // batch_size
             
             iter = 0
@@ -157,8 +163,14 @@ def train_logistic_sgd(
                         for seq_index in xrange(valid_reader.n_files):
                             valid_features, valid_labels = valid_reader.read_several()        
                             valid_error_array.append(validate_model(
-                                valid_features.get_value(borrow=True),
-                                valid_labels.eval()
+                                valid_features.get_value(
+                                    borrow=True,
+                                    return_internal_type=True
+                                ),
+                                valid_labels.get_value(
+                                    borrow=True,
+                                    return_internal_type=True
+                                )
                             ))
             
                         this_validation_loss = float(numpy.mean(valid_error_array))*100                 
@@ -211,9 +223,15 @@ def train_logistic_sgd(
     for pat_num in xrange(valid_reader.n_files):
         valid_features, valid_labels = valid_reader.read_several()        
         valid_error_array.append(validate_model(
-            valid_features.get_value(borrow=True),
-            valid_labels.eval()
-            ))
+            valid_features.get_value(
+                borrow=True,
+                return_internal_type=True
+            ),
+            valid_labels.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
+        ))
         
     this_validation_loss = float(numpy.mean(valid_error_array))*100                 
     classifier.valid_error_array.append([])
@@ -305,7 +323,10 @@ def pretrain_sda_sgd(
             for patients in xrange(train_reader.n_files):
                 # go through the training set
                 train_features, train_labels = train_reader.read_several()
-                train_features = train_features.get_value(borrow=True)
+                train_features = train_features.get_value(
+                    borrow=True,
+                    return_internal_type=True
+                )
                 n_train_batches = train_features.shape[0] // batch_size
                 
                 # go through pretraining epochs
@@ -333,7 +354,10 @@ def pretrain_sda_sgd(
                             for seq_index in xrange(valid_reader.n_files):
                                 valid_features, valid_labels = valid_reader.read_several()        
                                 valid_error_array.append(valid_fns[i](
-                                    valid_features.get_value(borrow=True),
+                                    valid_features.get_value(
+                                        borrow=True,
+                                        return_internal_type=True
+                                    ),
                                     corruption_levels[i]
                                 ))
                 
@@ -364,7 +388,10 @@ def pretrain_sda_sgd(
         for seq_index in xrange(valid_reader.n_files):
             valid_features, valid_labels = valid_reader.read_several()        
             valid_error_array.append(valid_fns[i](
-                valid_features.get_value(borrow=True),
+                valid_features.get_value(
+                    borrow=True,
+                    return_internal_type=True
+                ),
                 corruption_levels[i]
             ))
                 
@@ -442,8 +469,14 @@ def finetune_log_layer_sgd(
         for pat_num in xrange(train_reader.n_files):
             # go through the training set
             train_features, train_labels = train_reader.read_several()
-            train_features = train_features.get_value(borrow=True)
-            train_labels = train_labels.eval()
+            train_features = train_features.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
+            train_labels = train_labels.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
             n_train_batches = train_features.shape[0] // batch_size
             
             pat_epoch = 0    
@@ -475,8 +508,14 @@ def finetune_log_layer_sgd(
                         for valid_pat in xrange(valid_reader.n_files):
                             valid_features, valid_labels = valid_reader.read_several()
                             valid_error_array.append(validate_model(
-                                valid_features.get_value(borrow=True),
-                                valid_labels.eval()
+                                valid_features.get_value(
+                                    borrow=True,
+                                    return_internal_type=True
+                                ),
+                                valid_labels.get_value(
+                                    borrow=True,
+                                    return_internal_type=True
+                                )
                             ))
                         valid_mean_error = numpy.mean(valid_error_array)                        
                         sda.logLayer.valid_error_array.append([])
@@ -507,8 +546,14 @@ def finetune_log_layer_sgd(
     for valid_pat in xrange(valid_reader.n_files):
         valid_features, valid_labels = valid_reader.read_several()
         valid_error_array.append(validate_model(
-            valid_features.get_value(borrow=True),
-            valid_labels.eval()
+            valid_features.get_value(
+                borrow=True,
+                return_internal_type=True
+            ),
+            valid_labels.get_value(
+                borrow=True,
+                return_internal_type=True
+            )
         ))
     valid_mean_error = numpy.mean(valid_error_array)                        
     sda.logLayer.valid_error_array.append([])
