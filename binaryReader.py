@@ -69,9 +69,9 @@ class BinaryReader(object):
 
         set_x = theano.shared(numpy.asarray(feature_array),
                                      borrow=True)
-        set_y = theano.shared(numpy.asarray(labels,
-                                                   dtype='int32'),
-                                         borrow=True)       
+        set_y = T.cast(theano.shared(numpy.asarray(labels,
+                                                   dtype=theano.config.floatX),
+                                         borrow=True), 'int32')
         return (set_x, set_y)
         
     def read_several(self):
@@ -94,9 +94,9 @@ class BinaryReader(object):
         set_features = theano.shared(numpy.asarray(data_features,
                                                    dtype=theano.config.floatX),
                                      borrow=True)
-        set_labels = theano.shared(numpy.asarray(data_labels,
-                                                   dtype='int32'),
-                                     borrow=True)
+        set_labels = T.cast(theano.shared(numpy.asarray(data_labels,
+                                                   dtype=theano.config.floatX),
+                                     borrow=True), 'int32')
         
         return (set_features, set_labels) 
                    

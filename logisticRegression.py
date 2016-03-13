@@ -193,10 +193,7 @@ def test_log_reg(classifier, test_seq_len):
                 borrow=True,
                 return_internal_type=True
             ),
-            test_set_y.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            test_set_y.eval()
         ))
      
     return test_error_array

@@ -178,6 +178,8 @@ def pretrain_SdA(corruption_levels,
             test_seq_len = test_seq_len
         )
     else:
+        pretrained_sda = sda
+    '''
         pretrained_sda = pretrain_sda_cg(
             sda=sda,
             train_names=train_names,
@@ -188,7 +190,7 @@ def pretrain_SdA(corruption_levels,
             read_window = read_window
         )
                              
-    '''for i in xrange(sda.n_layers):
+        for i in xrange(sda.n_layers):
         visualize_pretraining(
             train_cost = pretrained_sda.dA_layers[i].train_cost_array,
             valid_error = pretrained_sda.dA_layers[i].valid_error_array,
@@ -201,7 +203,7 @@ def pretrain_SdA(corruption_levels,
         )
     '''
     gc.collect()    
-    return sda
+    return pretrained_sda
 
 def finetune_sda(pretrained_sda,
                  batch_size,
@@ -291,10 +293,7 @@ def test_sda(sda, test_seq_len = 1):
                 borrow=True,
                 return_internal_type=True
             ),
-            test_labels.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            test_labels.eval()
         ))
     gc.collect()
         

@@ -148,4 +148,4 @@ def train_sda_with_log_layer():
 
 
 if __name__ == '__main__':
-    train_many_regs()
+    train_sda_with_log_layer()

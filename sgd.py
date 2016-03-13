@@ -111,10 +111,7 @@ def train_logistic_sgd(
                 borrow=True,
                 return_internal_type=True
             )
-            train_labels = train_labels.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            train_labels = train_labels.eval()
             n_train_batches = train_features.shape[0] // batch_size
             
             while (pat_epoch < pat_epochs):
@@ -148,10 +145,7 @@ def train_logistic_sgd(
                                     borrow=True,
                                     return_internal_type=True
                                 ),
-                                valid_labels.get_value(
-                                    borrow=True,
-                                    return_internal_type=True
-                                )
+                                valid_labels.eval()
                             ))
             
                         this_validation_loss = float(numpy.mean(valid_error_array))*100                 
@@ -194,10 +188,7 @@ def train_logistic_sgd(
                 borrow=True,
                 return_internal_type=True
             ),
-            valid_labels.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            valid_labels.eval()
         ))
         
     this_validation_loss = float(numpy.mean(valid_error_array))*100                 
@@ -440,10 +431,7 @@ def finetune_log_layer_sgd(
                 borrow=True,
                 return_internal_type=True
             )
-            train_labels = train_labels.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            train_labels = train_labels.eval()
             n_train_batches = train_features.shape[0] // batch_size
             
             pat_epoch = 0    
@@ -479,10 +467,7 @@ def finetune_log_layer_sgd(
                                     borrow=True,
                                     return_internal_type=True
                                 ),
-                                valid_labels.get_value(
-                                    borrow=True,
-                                    return_internal_type=True
-                                )
+                                valid_labels.eval()
                             ))
                         valid_mean_error = numpy.mean(valid_error_array)                        
                         sda.logLayer.valid_error_array.append([])
@@ -517,10 +502,7 @@ def finetune_log_layer_sgd(
                 borrow=True,
                 return_internal_type=True
             ),
-            valid_labels.get_value(
-                borrow=True,
-                return_internal_type=True
-            )
+            valid_labels.eval()
         ))
     valid_mean_error = numpy.mean(valid_error_array)                        
     sda.logLayer.valid_error_array.append([])
