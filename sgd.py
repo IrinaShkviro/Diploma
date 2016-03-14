@@ -198,61 +198,38 @@ def train_logistic_sgd(
     classifier.validation = this_validation_loss
     return classifier
     
-def pretraining_functions_sda_sgd(sda, batch_size):
-    ''' Generates a list of functions, each of them implementing one
-    step in trainnig the dA corresponding to the layer with same index.
-    The function will require as input the minibatch index, and to train
-    a dA you just need to iterate, calling the corresponding function on
-    all minibatch indexes.
-    :type train_set_x: theano.tensor.TensorType
-    :param train_set_x: Shared variable that contains all datapoints used
-                        for training the dA
-    :type window_size: int
-    :param window_size: size of a window
-    :type learning_rate: float
-    :param learning_rate: learning rate used during training for any of
-                              the dA layers
-    '''
-
-    index = T.lscalar('index')
+def pretraining_functions(sda, train_set_x, batch_size):
+    # index to a [mini]batch
+    index = T.lscalar('index')  # index to a minibatch
     corruption_level = T.scalar('corruption')  # % of corruption to use
     learning_rate = T.scalar('lr')  # learning rate to use
-    train_set = T.matrix('train_set')
+    # begining of a batch, given `index`
+    batch_begin = index * batch_size
+    # ending of a batch given `index`
+    batch_end = batch_begin + batch_size
 
     pretrain_fns = []
-    valid_fns = []
-    for cur_dA in sda.dA_layers:
+    for dA in sda.dA_layers:
         # get the cost and the updates list
-        cost, updates = cur_dA.get_cost_updates(
-            corruption_level=corruption_level,
-            learning_rate=learning_rate
-        )
-
+        cost, updates = dA.get_cost_updates(corruption_level,
+                                            learning_rate)
         # compile the theano function
         fn = theano.function(
             inputs=[
                 index,
-                train_set,
                 theano.Param(corruption_level, default=0.2),
-                theano.Param(learning_rate, default=0.1)
+                theano.Param(learning_rate, default=0.01)
             ],
             outputs=cost,
             updates=updates,
             givens={
-                sda.x: train_set[index * batch_size: index * batch_size + batch_size]
+                sda.x: train_set_x[batch_begin: batch_end]
             }
         )
-        
-        vf = theano.function(
-            inputs=[sda.x, theano.Param(corruption_level, default=0.2)],
-            outputs=cost
-        )
-                
         # append `fn` to the list of functions
         pretrain_fns.append(fn)
-        valid_fns.append(vf)
 
-    return pretrain_fns, valid_fns
+    return pretrain_fns
     
 def pretrain_sda_sgd(
         sda,
@@ -264,10 +241,6 @@ def pretrain_sda_sgd(
         train_seq_len=20,
         test_seq_len=40):    
     
-    pretraining_fns, valid_fns = pretraining_functions_sda_sgd(sda=sda,
-                                                    batch_size=batch_size)
-
-    validation_frequency = 5000*pat_epochs*global_epochs
     ## Pre-train layer-wise
     for i in xrange(sda.n_layers):
         cur_dA = sda.dA_layers[i]
@@ -281,11 +254,11 @@ def pretrain_sda_sgd(
             for patients in xrange(train_reader.n_files):
                 # go through the training set
                 train_features, train_labels = train_reader.read_several()
-                train_features = train_features.get_value(
-                    borrow=True,
-                    return_internal_type=True
-                )
-                n_train_batches = train_features.shape[0] // batch_size
+                pretraining_fns = pretraining_functions(sda=sda,
+                                                        train_set_x=train_features,
+                                                        batch_size=batch_size)
+                n_train_batches = train_features.get_value(borrow=True,
+                                                           return_internal_type=True).shape[0] // batch_size
                 
                 # go through pretraining epochs
                 for pat_epoch in xrange(pat_epochs):
@@ -296,107 +269,16 @@ def pretrain_sda_sgd(
                         iter = iter + 1
                     
                         cur_epoch_cost.append(pretraining_fns[i](index=index,
-                                 train_set = train_features,
                                  corruption=corruption_levels[i],
                                  lr=pretrain_lr))
-                                 
-                        # test on valid set        
-                        if (iter + 1) % validation_frequency == 0:
-                            valid_reader = BinaryReader(
-                                isTrain=False,
-                                len_seqs=test_seq_len
-                            )
-                            # compute zero-one loss on validation set
-                            valid_error_array = []    
-            
-                            for seq_index in xrange(valid_reader.n_files):
-                                valid_features, valid_labels = valid_reader.read_several()        
-                                valid_error_array.append(valid_fns[i](
-                                    valid_features.get_value(
-                                        borrow=True,
-                                        return_internal_type=True
-                                    ),
-                                    corruption_levels[i]
-                                ))
-                
-                            this_validation_loss = float(numpy.mean(valid_error_array))*100
-                        
-                            cur_dA.valid_error_array.append([])
-                            cur_dA.valid_error_array[-1].append(
-                                cur_dA.epoch + float(index)/n_train_batches
-                            )
-                            cur_dA.valid_error_array[-1].append(this_validation_loss)
-                            
-                            gc.collect()
-                                        
+                                                                         
                     cur_dA.train_cost_array.append([])
                     cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
                     cur_dA.train_cost_array[-1].append(numpy.mean(cur_epoch_cost))
                     
             gc.collect()
-        
-        cur_dA.epoch = cur_dA.epoch + 1
-        valid_reader = BinaryReader(
-            isTrain=False,
-            len_seqs=test_seq_len
-        )
-        # compute zero-one loss on validation set
-        valid_error_array = []    
-            
-        for seq_index in xrange(valid_reader.n_files):
-            valid_features, valid_labels = valid_reader.read_several()        
-            valid_error_array.append(valid_fns[i](
-                valid_features.get_value(
-                    borrow=True,
-                    return_internal_type=True
-                ),
-                corruption_levels[i]
-            ))
-                
-        this_validation_loss = float(numpy.mean(valid_error_array))*100
-                        
-        cur_dA.valid_error_array.append([])
-        cur_dA.valid_error_array[-1].append(float(cur_dA.epoch))
-        cur_dA.valid_error_array[-1].append(this_validation_loss)
-            
+                    
     return sda
-
-   
-def build_finetune_functions(sda, batch_size, learning_rate):
-
-    index = T.lscalar('index')  # index to a [mini]batch
-    train_set_x = T.matrix('train_set_x')
-    train_set_y = T.ivector('train_set_y')    
-
-    # compute the gradients with respect to the model parameters
-    gparams = T.grad(sda.finetune_cost, sda.params)
-
-    # compute list of fine-tuning updates
-    updates = [
-        (param, param - gparam * learning_rate)
-        for param, gparam in zip(sda.params, gparams)
-    ]
-
-    train_fn = theano.function(
-        inputs=[
-            index,
-            train_set_x,
-            train_set_y
-        ],
-        outputs=sda.finetune_cost,
-        updates=updates,
-        givens={
-            sda.x: train_set_x[index * batch_size: (index + 1) * batch_size],
-            sda.y: train_set_y[index * batch_size: (index + 1) * batch_size]
-        }
-    )
-
-    test_score = theano.function(
-        inputs=[sda.x, sda.y],
-        outputs=[sda.errors]
-    )
-
-    return train_fn, test_score
     
 def build_finetune_train(sda, dataset, batch_size, learning_rate):
 
