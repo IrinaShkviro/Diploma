@@ -102,7 +102,7 @@ def train_many_regs():
     print('max value of best error: ', numpy.round(numpy.amax(best_test_errors), 6)) 
 
 def train_sda_with_log_layer():
-    pretrain_algo = 'sgd'
+    pretrain_algo = 'no'
     pretrain_lr = 0.001    
     pretraining_epochs = 1
     pretraining_pat_epochs = 1

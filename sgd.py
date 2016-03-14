@@ -360,7 +360,8 @@ def pretrain_sda_sgd(
         cur_dA.valid_error_array[-1].append(this_validation_loss)
             
     return sda
-    
+
+   
 def build_finetune_functions(sda, batch_size, learning_rate):
 
     index = T.lscalar('index')  # index to a [mini]batch
@@ -397,6 +398,67 @@ def build_finetune_functions(sda, batch_size, learning_rate):
 
     return train_fn, test_score
     
+def build_finetune_train(sda, dataset, batch_size, learning_rate):
+
+    (train_set_x, train_set_y) = dataset
+    index = T.lscalar('index')  # index to a [mini]batch
+
+    # compute the gradients with respect to the model parameters
+    gparams = T.grad(sda.finetune_cost, sda.params)
+
+    # compute list of fine-tuning updates
+    updates = [
+        (param, param - gparam * learning_rate)
+        for param, gparam in zip(sda.params, gparams)
+    ]
+
+    train_fn = theano.function(
+        inputs=[index],
+        outputs=[sda.finetune_cost, sda.errors],
+        updates=updates,
+        givens={
+            sda.x: train_set_x[
+                index * batch_size: (index + 1) * batch_size
+            ],
+            sda.y: train_set_y[
+                index * batch_size: (index + 1) * batch_size
+            ]
+        },
+        name='train'
+    )
+
+    return train_fn
+        
+def build_finetune_valid(sda, dataset, batch_size):
+
+    (valid_set_x, valid_set_y) = dataset
+
+    # compute number of minibatches for training, validation and testing
+    n_valid_batches = valid_set_x.get_value(borrow=True).shape[0]
+    n_valid_batches //= batch_size
+
+    index = T.lscalar('index')  # index to a [mini]batch
+
+    valid_score_i = theano.function(
+        [index],
+        sda.errors,
+        givens={
+            sda.x: valid_set_x[
+                index * batch_size: (index + 1) * batch_size
+            ],
+            sda.y: valid_set_y[
+                index * batch_size: (index + 1) * batch_size
+            ]
+        },
+        name='valid'
+    )
+
+    # Create a function that scans the entire validation set
+    def valid_score():
+        return [valid_score_i(i) for i in range(n_valid_batches)]
+
+    return valid_score
+    
 def finetune_log_layer_sgd(
     sda,
     batch_size,
@@ -408,13 +470,6 @@ def finetune_log_layer_sgd(
     ########################
     # FINETUNING THE MODEL #
     ########################
-
-    # get the training, validation and testing functions for the model
-    train_fn, validate_model = build_finetune_functions(
-        sda=sda,
-        batch_size=batch_size,
-        learning_rate=finetune_lr
-    )
     
     iter = 0
     validation_frequency = 500*pat_epochs*global_epochs
@@ -427,12 +482,17 @@ def finetune_log_layer_sgd(
         for pat_num in xrange(train_reader.n_files):
             # go through the training set
             train_features, train_labels = train_reader.read_several()
-            train_features = train_features.get_value(
+            n_train_batches = train_features.get_value(
                 borrow=True,
                 return_internal_type=True
+            ).shape[0] // batch_size
+            
+            train_fn = build_finetune_train(
+                sda=sda,
+                dataset=(train_features, train_labels),
+                batch_size=batch_size,
+                learning_rate=finetune_lr
             )
-            train_labels = train_labels.eval()
-            n_train_batches = train_features.shape[0] // batch_size
             
             pat_epoch = 0    
             while (pat_epoch < pat_epochs):
@@ -441,10 +501,8 @@ def finetune_log_layer_sgd(
                 cur_train_cost = []
                 cur_train_error = []
                 for batch_index in xrange(n_train_batches):          
-                    sample_cost, sample_error, cur_pred, cur_actual = train_fn(
-                        index = batch_index,
-                        train_set_x = train_features,
-                        train_set_y = train_labels
+                    sample_cost, sample_error = train_fn(
+                        index = batch_index
                     )
                     
                     # iteration number
@@ -462,13 +520,12 @@ def finetune_log_layer_sgd(
                         valid_error_array = [] 
                         for valid_pat in xrange(valid_reader.n_files):
                             valid_features, valid_labels = valid_reader.read_several()
-                            valid_error_array.append(validate_model(
-                                valid_features.get_value(
-                                    borrow=True,
-                                    return_internal_type=True
-                                ),
-                                valid_labels.eval()
-                            ))
+                            validate_model = build_finetune_valid(
+                                sda=sda,
+                                dataset=(valid_features, valid_labels),
+                                batch_size=batch_size
+                            )
+                            valid_error_array.append(numpy.mean(validate_model()))
                         valid_mean_error = numpy.mean(valid_error_array)                        
                         sda.logLayer.valid_error_array.append([])
                         sda.logLayer.valid_error_array[-1].append(
