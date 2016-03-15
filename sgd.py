@@ -11,6 +11,8 @@ import numpy
 
 import theano
 import theano.tensor as T
+import pickle
+import os
 
 from binaryReader import BinaryReader
     
@@ -271,13 +273,97 @@ def pretrain_sda_sgd(
                         cur_epoch_cost.append(pretraining_fns[i](index=index,
                                  corruption=corruption_levels[i],
                                  lr=pretrain_lr))
-                                                                         
+                            
+                    mean_cost = numpy.mean(cur_epoch_cost)                                             
                     cur_dA.train_cost_array.append([])
                     cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
-                    cur_dA.train_cost_array[-1].append(numpy.mean(cur_epoch_cost))
+                    cur_dA.train_cost_array[-1].append(mean_cost)
                     
             gc.collect()
                     
+    return sda
+
+def pretrain_many_sda_sgd(
+        n_attempts,
+        sda,
+        pretrain_lr,
+        corruption_levels,
+        global_epochs,
+        pat_epochs,
+        batch_size,
+        train_seq_len=20,
+        test_seq_len=40):    
+    
+    init_folder = 'init_das'
+    if not os.path.isdir(init_folder):
+        os.makedirs(init_folder)
+    ## Pre-train layer-wise
+    for i in xrange(sda.n_layers):
+        cur_dA = sda.dA_layers[i]
+        cur_dA.train_cost_array = []
+        best_attempt_cost = numpy.inf
+        best_model_name = ('best_da_num_%i.pkl')%(i)
+        
+        # save clean model
+        os.chdir(init_folder)
+        init_da_name = ('init_num_%i.pkl')%(i)
+        with open(init_da_name, 'wb') as f:
+            pickle.dump(cur_dA, f)
+        os.chdir('../')
+            
+        for cur_attempt in xrange(n_attempts):
+            iter = 0
+            attempt_cost = []
+            
+            # open clean model
+            cur_dA = pickle.load(open(init_da_name))
+            for global_epoch in xrange(global_epochs):
+                train_reader = BinaryReader(
+                    isTrain=True,
+                    len_seqs=train_seq_len
+                )           
+                for patients in xrange(train_reader.n_files):
+                    # go through the training set
+                    train_features, train_labels = train_reader.read_several()
+                    pretraining_fns = pretraining_functions(sda=sda,
+                                                            train_set_x=train_features,
+                                                            batch_size=batch_size)
+                    n_train_batches = train_features.get_value(borrow=True,
+                                                               return_internal_type=True).shape[0] // batch_size
+                    
+                    cur_epoch_cost = []
+                    # go through pretraining epochs
+                    for pat_epoch in xrange(pat_epochs):
+                        cur_dA.epoch = cur_dA.epoch + 1
+                        cur_epoch_cost=[]                      
+                        for index in xrange(n_train_batches):
+                            # iteration number
+                            iter = iter + 1
+                        
+                            cur_epoch_cost.append(pretraining_fns[i](index=index,
+                                     corruption=corruption_levels[i],
+                                     lr=pretrain_lr))                            
+                        mean_cost = numpy.mean(cur_epoch_cost)                                             
+                        cur_dA.train_cost_array.append([])
+                        cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
+                        cur_dA.train_cost_array[-1].append(mean_cost)
+                    if global_epoch == global_epochs-1:    
+                        attempt_cost = numpy.concatenate(attempt_cost, cur_epoch_cost)
+                        
+                gc.collect()
+            if best_attempt_cost > numpy.mean(attempt_cost):
+                best_attempt_cost = numpy.mean(attempt_cost)
+                cur_dA.best_cost = best_attempt_cost
+                #save the best model for cur_da                
+                os.chdir('best_models')
+                with open(best_model_name, 'wb') as f:
+                    pickle.dump(cur_dA, f)
+                os.chdir('../')
+                
+        # load the best model in sda
+        os.chdir('best_models')
+        sda.dA_layers[i] = pickle.load(open(best_model_name))
+        os.chdir('../')
     return sda
     
 def build_finetune_train(sda, dataset, batch_size, learning_rate):

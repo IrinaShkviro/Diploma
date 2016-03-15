@@ -15,6 +15,7 @@ import numpy
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
+import pickle
 
 from hiddenLayer import HiddenLayer
 from dA import dA
@@ -212,24 +213,86 @@ def finetune_sda(pretrained_sda,
                  finetune_pat_epochs,
                  train_seq_len,
                  test_seq_len,
-                 finetune_algo):
-    # train logistic regression layer
-    if finetune_algo == 'sgd':    
-        finetuned_sda = finetune_log_layer_sgd(
-            sda = pretrained_sda,
-            batch_size = batch_size,
-            finetune_lr = finetune_lr,
-            global_epochs = finetune_epochs,
-            pat_epochs = finetune_pat_epochs,
-            train_seq_len = train_seq_len,
-            test_seq_len = test_seq_len
-        )
-        
-    else:        
-        finetuned_sda = pretrained_sda
-    return finetuned_sda
+                 finetune_algo,
+                 n_attempts = 1):
+    os.chdir('best_models')
+    with open('best_pretrain_sda.pkl', 'wb') as f:
+        pickle.dump(pretrained_sda, f)
+    os.chdir('../')
+    best_valid = numpy.inf
+    for attempt in xrange(n_attempts):
+        pretrained_sda = pickle.load(open('best_pretrain_sda.pkl'))
+        # train logistic regression layer
+        if finetune_algo == 'sgd':    
+            finetuned_sda = finetune_log_layer_sgd(
+                sda = pretrained_sda,
+                batch_size = batch_size,
+                finetune_lr = finetune_lr,
+                global_epochs = finetune_epochs,
+                pat_epochs = finetune_pat_epochs,
+                train_seq_len = train_seq_len,
+                test_seq_len = test_seq_len
+            )
+            
+        else:        
+            finetuned_sda = pretrained_sda
+            
+        if finetuned_sda.logLayer.validation < best_valid:
+            best_valid = finetuned_sda.logLayer.validation
+            os.chdir('best_models')
+            with open('best_sda.pkl', 'wb') as f:
+                pickle.dump(finetuned_sda, f)
+            os.chdir('../')
+    
+    best_sda = pickle.load(open('best_sda.pkl'))        
+    return best_sda
         
 def train_sda(corruption_levels,
+              pretraining_epochs,
+              pretraining_pat_epochs,
+              pretrain_lr,
+              hidden_layer_sizes,
+              pretrain_algo,
+              n_features,
+              n_classes,
+              batch_size,
+              train_seq_len,
+              test_seq_len,
+              finetune_lr,
+              finetune_epochs,
+              finetune_pat_epochs,
+              finetune_algo
+              ):
+    base_folder = 'sda_log_reg'
+    pretrained_sda = pretrain_SdA(
+        corruption_levels = corruption_levels,
+        pretraining_epochs = pretraining_epochs,
+        pretraining_pat_epochs = pretraining_pat_epochs,
+        pretrain_lr = pretrain_lr,        
+        pretrain_algo = pretrain_algo,
+        hidden_layers_sizes = hidden_layer_sizes,
+        output_folder = ('pretrain_sda_%s')%(pretrain_algo),
+        base_folder = base_folder,
+        n_features = n_features,
+        n_classes = n_classes,
+        batch_size = batch_size,
+        train_seq_len = train_seq_len,
+        test_seq_len = test_seq_len
+    )
+    # train logistic regression layer
+    finetuned_sda = finetune_sda(
+        pretrained_sda = pretrained_sda,
+        batch_size = batch_size,
+        finetune_lr = finetune_lr,
+        finetune_epochs = finetune_epochs,
+        finetune_pat_epochs = finetune_pat_epochs,
+        train_seq_len = train_seq_len,
+        test_seq_len = test_seq_len,
+        finetune_algo = finetune_algo
+    )
+    return finetuned_sda
+    
+def train_many_sda(corruption_levels,
               pretraining_epochs,
               pretraining_pat_epochs,
               pretrain_lr,

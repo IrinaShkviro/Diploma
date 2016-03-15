@@ -99,6 +99,7 @@ class dA(object):
         self.train_cost_array=[]
         self.valid_error_array = []
         self.epoch=0
+        self.best_cost = numpy.inf
 
     def get_corrupted_input(self, input, corruption_level):
         """ This function keeps ``1-corruption_level`` entries of the inputs the
