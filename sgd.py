@@ -351,7 +351,7 @@ def pretrain_many_sda_sgd(
                         cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
                         cur_dA.train_cost_array[-1].append(mean_cost)
                     if global_epoch == global_epochs-1:    
-                        attempt_cost = numpy.concatenate(attempt_cost, cur_epoch_cost)
+                        attempt_cost = numpy.concatenate((attempt_cost, cur_epoch_cost))
                         
                 gc.collect()
             if best_attempt_cost > numpy.mean(attempt_cost):
