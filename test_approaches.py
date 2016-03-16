@@ -106,6 +106,7 @@ def train_sda_with_log_layer():
     pretrain_lr = 0.001    
     pretraining_epochs = 1
     pretraining_pat_epochs = 1
+    pretrain_attempts = 1
     
     corruption_levels = [0.1, 0.2]
     hidden_layer_sizes = [n_features/2, n_features/3]
@@ -117,6 +118,7 @@ def train_sda_with_log_layer():
     finetune_epochs = 1
     finetune_pat_epochs = 1
     finetune_algo = 'sgd'
+    finetune_attempts = 1
 
     # 3rd approach
     # classifier after autoencoder, long train for single model   
@@ -135,7 +137,9 @@ def train_sda_with_log_layer():
         finetune_lr = finetune_lr,
         finetune_epochs = finetune_epochs,
         finetune_pat_epochs = finetune_pat_epochs,
-        finetune_algo = finetune_algo
+        finetune_algo = finetune_algo,
+        pretrain_attempts = pretrain_attempts,
+        finetune_attempts = finetune_attempts
     )
     test_errors = test_sda (
         sda = trained_sda,

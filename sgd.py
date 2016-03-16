@@ -284,7 +284,6 @@ def pretrain_sda_sgd(
     return sda
 
 def pretrain_many_sda_sgd(
-        n_attempts,
         sda,
         pretrain_lr,
         corruption_levels,
@@ -292,7 +291,8 @@ def pretrain_many_sda_sgd(
         pat_epochs,
         batch_size,
         train_seq_len=20,
-        test_seq_len=40):    
+        test_seq_len=40,
+        n_attempts=1):    
     
     init_folder = 'init_das'
     if not os.path.isdir(init_folder):
@@ -316,7 +316,10 @@ def pretrain_many_sda_sgd(
             attempt_cost = []
             
             # open clean model
+            os.chdir(init_folder)
             cur_dA = pickle.load(open(init_da_name))
+            os.chdir('../')
+            
             for global_epoch in xrange(global_epochs):
                 train_reader = BinaryReader(
                     isTrain=True,
@@ -354,6 +357,7 @@ def pretrain_many_sda_sgd(
             if best_attempt_cost > numpy.mean(attempt_cost):
                 best_attempt_cost = numpy.mean(attempt_cost)
                 cur_dA.best_cost = best_attempt_cost
+                
                 #save the best model for cur_da                
                 os.chdir('best_models')
                 with open(best_model_name, 'wb') as f:
