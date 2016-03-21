@@ -99,29 +99,20 @@ class SdA(object):
             )
             # add the layer to our list of layers
             self.sigmoid_layers.append(sigmoid_layer)
-            self.params.append(sigmoid_layer.theta)
+            self.params.extend(sigmoid_layer.params)
 
             # Construct a denoising autoencoder that shared weights with this layer
             dA_layer = dA(
                 numpy_rng=numpy_rng,
                 theano_rng=theano_rng,
-                input=layer_input,
+                input=sigmoid_layer.input,
                 n_visible=input_size,
                 n_hidden=hidden_layers_sizes[i],
-                theta=sigmoid_layer.theta
+                W=sigmoid_layer.W,
+                bhid=sigmoid_layer.b
             )
             
             self.dA_layers.append(dA_layer)
-
-        sda_input = T.matrix('sda_input')
-        self.da_layers_output_size = hidden_layers_sizes[-1]
-        self.get_da_output = theano.function(
-            inputs=[sda_input],
-            outputs=self.sigmoid_layers[-1].output.reshape((-1, self.da_layers_output_size)),
-            givens={
-                self.x: sda_input
-            }
-        )
         
         self.logLayer = LogisticRegression(
             rng = numpy.random.RandomState(),
@@ -129,7 +120,8 @@ class SdA(object):
             n_in=hidden_layers_sizes[-1],
             n_out=n_outs
         )
-        #self.params.extend(self.logLayer.params)
+        
+        self.params.extend(self.logLayer.params)
         self.finetune_cost = self.logLayer.negative_log_likelihood(self.y)
         self.errors = self.logLayer.errors(self.y)
                         
@@ -205,7 +197,7 @@ def pretrain_SdA(corruption_levels,
             base_folder = base_folder
         )
     '''
-    gc.collect()    
+    gc.collect()
     return pretrained_sda
 
 def finetune_sda(pretrained_sda,

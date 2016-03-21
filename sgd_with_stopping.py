@@ -45,11 +45,13 @@ def training_functions_log_reg_sgd(classifier, batch_size=1):
     learning_rate = T.scalar('lr')  # learning rate to use
     
     # compute the gradient of cost with respect to theta = (W,b)
-    g_theta = T.grad(cost=cost, wrt=classifier.theta)
+    g_W = T.grad(cost=cost, wrt=classifier.W)
+    g_b = T.grad(cost=cost, wrt=classifier.b)
     
     # specify how to update the parameters of the model as a list of
     # (variable, update expression) pairs.
-    updates = [(classifier.theta, classifier.theta - learning_rate * g_theta)]
+    updates = [(classifier.W, classifier.W - learning_rate * g_W),
+               (classifier.b, classifier.b - learning_rate * g_b)]
     # compiling a Theano function `train_model` that returns the cost, but in
     # the same time updates the parameter of the model based on the rules
     # defined in `updates`

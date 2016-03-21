@@ -205,16 +205,14 @@ def pretraining_functions(sda, train_set_x, batch_size):
     index = T.lscalar('index')  # index to a minibatch
     corruption_level = T.scalar('corruption')  # % of corruption to use
     learning_rate = T.scalar('lr')  # learning rate to use
-    # begining of a batch, given `index`
-    batch_begin = index * batch_size
-    # ending of a batch given `index`
-    batch_end = batch_begin + batch_size
-
+    
     pretrain_fns = []
     for dA in sda.dA_layers:
         # get the cost and the updates list
-        cost, updates = dA.get_cost_updates(corruption_level,
-                                            learning_rate)
+        cost, updates = dA.get_cost_updates(
+            corruption_level=corruption_level,
+            learning_rate=learning_rate
+        )
         # compile the theano function
         fn = theano.function(
             inputs=[
@@ -225,8 +223,9 @@ def pretraining_functions(sda, train_set_x, batch_size):
             outputs=cost,
             updates=updates,
             givens={
-                sda.x: train_set_x[batch_begin: batch_end]
-            }
+                sda.x: train_set_x[index * batch_size: index * batch_size+ batch_size]
+            },
+            on_unused_input='ignore'
         )
         # append `fn` to the list of functions
         pretrain_fns.append(fn)
@@ -266,11 +265,11 @@ def pretrain_sda_sgd(
                 for pat_epoch in xrange(pat_epochs):
                     cur_dA.epoch = cur_dA.epoch + 1
                     cur_epoch_cost=[]                      
-                    for index in xrange(n_train_batches):
+                    for batch_index in xrange(n_train_batches):
                         # iteration number
                         iter = iter + 1
                     
-                        cur_epoch_cost.append(pretraining_fns[i](index=index,
+                        cur_epoch_cost.append(pretraining_fns[i](index=batch_index,
                                  corruption=corruption_levels[i],
                                  lr=pretrain_lr))
                             
@@ -313,6 +312,7 @@ def pretrain_many_sda_sgd(
             
         for cur_attempt in xrange(n_attempts):
             iter = 0
+            print('cur_attempt: ', cur_attempt)
             attempt_cost = []
             
             # open clean model
@@ -358,7 +358,9 @@ def pretrain_many_sda_sgd(
                 best_attempt_cost = numpy.mean(attempt_cost)
                 cur_dA.best_cost = best_attempt_cost
                 
-                #save the best model for cur_da                
+                #save the best model for cur_da
+                if not os.path.isdir('best_models'):
+                        os.makedirs('best_models')                
                 os.chdir('best_models')
                 with open(best_model_name, 'wb') as f:
                     pickle.dump(cur_dA, f)
@@ -368,6 +370,7 @@ def pretrain_many_sda_sgd(
         os.chdir('best_models')
         sda.dA_layers[i] = pickle.load(open(best_model_name))
         os.chdir('../')
+    print('finish pretraining')
     return sda
     
 def build_finetune_train(sda, dataset, batch_size, learning_rate):

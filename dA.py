@@ -27,8 +27,9 @@ class dA(object):
         n_hidden,
         theano_rng=None,
         input=None,
-        theta=None,
-        bvis=None
+        W=None,
+        bvis=None,
+        bhid=None
     ):
         """
         :type numpy_rng: numpy.random.RandomState
@@ -40,7 +41,6 @@ class dA(object):
         """
         self.n_visible = n_visible
         self.n_hidden = n_hidden
-        self.input = input
 
         # create a Theano random generator that gives symbolic random values
         if not theano_rng:
@@ -49,34 +49,44 @@ class dA(object):
         # initialize theta = (W,b) with 0s; W gets the shape (n_visible, n_hidden),
         # while b is a vector of n_out elements, making theta a vector of
         # n_visible*n_hidden + n_hidden elements
-        if not theta:
-            theta_values = numpy.asarray(
+        if not W:
+            # W is initialized with `initial_W` which is uniformely sampled
+            # from -4*sqrt(6./(n_visible+n_hidden)) and
+            # 4*sqrt(6./(n_hidden+n_visible))the output of uniform if
+            # converted using asarray to dtype
+            # theano.config.floatX so that the code is runable on GPU
+            initial_W = numpy.asarray(
                 numpy_rng.uniform(
-                    low=-4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
-                    high=4 * numpy.sqrt(6. / (n_hidden + n_visible + 1)),
-                    size=(n_visible * n_hidden + n_hidden)
+                    low=0,
+                    high=0.05,
+                    size=(n_visible, n_hidden)
                 ),
                 dtype=theano.config.floatX
             )
-            theta = theano.shared(
-                value=theta_values,
-                name='theta',
-                borrow=True
-            )
-        self.theta = theta
+            W = theano.shared(value=initial_W, name='W', borrow=True)
         
-        # W is represented by the fisr n_visible*n_hidden elements of theta
-        W = self.theta[0:n_visible * n_hidden].reshape((n_visible, n_hidden))
-        # b is the rest (last n_hidden elements)
-        bhid = self.theta[n_visible * n_hidden:n_visible * n_hidden + n_hidden]
-
         if not bvis:
             bvis_values = numpy.asarray(
-                numpy_rng.uniform(self.n_visible,),
+                numpy_rng.uniform(
+                    low=0,
+                    high=0.05,
+                    size=(n_visible,)
+                ),
                 dtype=theano.config.floatX
             )
             bvis = theano.shared(
                 value=bvis_values,
+                borrow=True
+            )
+            
+        if not bhid:
+            bhid = theano.shared(
+                value=numpy_rng.uniform(
+                    low=0,
+                    high=0.05,
+                    size=(n_hidden,)
+                ),
+                name='b',
                 borrow=True
             )
 
@@ -94,7 +104,7 @@ class dA(object):
         else:
             self.x = input
 
-        self.params = [self.theta, self.b_prime]
+        self.params = [self.W, self.b, self.b_prime]
         
         self.train_cost_array=[]
         self.valid_error_array = []
@@ -129,9 +139,9 @@ class dA(object):
         tilde_x = self.get_corrupted_input(self.x, corruption_level)
         
         y = self.get_hidden_values(tilde_x)
-        self.z = self.get_reconstructed_input(y)
+        z = self.get_reconstructed_input(y)
         
-        cost = T.sqrt(T.sum(T.sqr(T.flatten(self.x - self.z))))
+        cost = T.sqrt(T.sum(T.sqr(T.flatten(self.x - z))))
                 
         return cost
         
@@ -141,8 +151,10 @@ class dA(object):
 
         tilde_x = self.get_corrupted_input(self.x, corruption_level)
         y = self.get_hidden_values(tilde_x)
-        self.z = self.get_reconstructed_input(y)
-        cost = T.sqrt(T.sum(T.sqr(T.flatten(self.x - self.z, outdim=1))))
+        z = self.get_reconstructed_input(y)
+        
+        L = - T.sum(self.x * T.log(z) + (1 - self.x) * T.log(1 - z), axis=1)
+        cost = T.mean(L)
 
         # compute the gradients of the cost of the `dA` with respect
         # to its parameters

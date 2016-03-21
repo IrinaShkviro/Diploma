@@ -23,13 +23,13 @@ n_features = 75
 n_classes = 39
 
 def train_one_classifier():
-    learning_rate = 0.0001    
-    pat_epochs = 1
-    batch_size = 10
+    learning_rate = 0.05    
+    pat_epochs = 150
+    batch_size = 1000
     train_algo = 'sgd'
     global_epochs = 1
-    train_seq_len = 20
-    test_seq_len = 40
+    train_seq_len = 500
+    test_seq_len = 500
     
     # 1st approach
     # long training for one classifier
@@ -110,9 +110,9 @@ def train_sda_with_log_layer():
     
     corruption_levels = [0.1, 0.2]
     hidden_layer_sizes = [n_features/2, n_features/3]
-    batch_size = 10    
-    train_seq_len = 20
-    test_seq_len = 40
+    batch_size = 1    
+    train_seq_len = 128
+    test_seq_len = 128
     
     finetune_lr = 0.001
     finetune_epochs = 1

@@ -29,31 +29,35 @@ class LogisticRegression(object):
         self.n_in = n_in
         self.n_out = n_out
 
-        # initialize theta = (W,b) with random values;
-        # W gets the shape (n_in, n_out),
-        # while b is a vector of n_out elements
-        # making theta a vector of n_in*n_out + n_out elements
         rng.seed()
-        theta_values = numpy.asarray(
-            rng.uniform(
-                low=-numpy.sqrt(6. / (n_in + n_out)),
-                high=numpy.sqrt(6. / (n_in + n_out)),
-                size=n_in * n_out + n_out
+        
+        self.W = theano.shared(
+            value = numpy.asarray(
+                rng.uniform(
+                    low=0,
+                    high=0.05,
+                    size=(n_in, n_out)
+                ),
+                dtype=theano.config.floatX
             ),
-            dtype=theano.config.floatX
-        )
-        self.theta = theano.shared(
-            value=theta_values,
-            name='theta',
+            name='W',
             borrow=True
-        )        
+        )
         
-        # separate W from theta
-        self.W = self.theta[0:n_in * n_out].reshape((n_in, n_out))
+        # initialize the biases b as a vector of n_out 0s
+        self.b = theano.shared(
+            value=numpy.asarray(
+                rng.uniform(
+                    low=0,
+                    high=0.05,
+                    size=(n_out,)
+                ),
+                dtype=theano.config.floatX
+            ),
+            name='b',
+            borrow=True
+        )
         
-        # separate b from theta
-        self.b = self.theta[n_in * n_out:n_in * n_out + n_out]
-
         # symbolic expression for computing the matrix of class-membership
         # probabilities
         # Where:
@@ -70,6 +74,8 @@ class LogisticRegression(object):
 
         # parameters of the model
         self.params = [self.W, self.b]
+        
+        self.input = input
         
         self.valid_error_array = []
         self.train_cost_array = []
