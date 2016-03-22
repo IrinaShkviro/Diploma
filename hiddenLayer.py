@@ -20,7 +20,7 @@ import theano.tensor as T
 
 class HiddenLayer(object):
     def __init__(self, rng, input, n_in, n_out, W=None, b=None, activation=T.tanh):
-        self.input = input
+        self.input = input.reshape((-1, n_in))
         rng.seed()
         if W is None:
             W_values = numpy.asarray(

@@ -200,11 +200,12 @@ def train_logistic_sgd(
     classifier.validation = this_validation_loss
     return classifier
     
-def pretraining_functions(sda, train_set_x, batch_size):
+def pretraining_functions(sda, batch_size):
     # index to a [mini]batch
     index = T.lscalar('index')  # index to a minibatch
     corruption_level = T.scalar('corruption')  # % of corruption to use
     learning_rate = T.scalar('lr')  # learning rate to use
+    train_set_x = T.matrix('train_set')
     
     pretrain_fns = []
     for dA in sda.dA_layers:
@@ -213,15 +214,17 @@ def pretraining_functions(sda, train_set_x, batch_size):
             corruption_level=corruption_level,
             learning_rate=learning_rate
         )
+        print('da_input', dA.x.type)
         # compile the theano function
         fn = theano.function(
             inputs=[
                 index,
+                train_set_x,
                 theano.Param(corruption_level, default=0.2),
                 theano.Param(learning_rate, default=0.01)
             ],
             outputs=cost,
-            updates=updates,
+            #updates=updates,
             givens={
                 sda.x: train_set_x[index * batch_size: index * batch_size+ batch_size]
             },
@@ -256,7 +259,6 @@ def pretrain_sda_sgd(
                 # go through the training set
                 train_features, train_labels = train_reader.read_several()
                 pretraining_fns = pretraining_functions(sda=sda,
-                                                        train_set_x=train_features,
                                                         batch_size=batch_size)
                 n_train_batches = train_features.get_value(borrow=True,
                                                            return_internal_type=True).shape[0] // batch_size
@@ -270,6 +272,7 @@ def pretrain_sda_sgd(
                         iter = iter + 1
                     
                         cur_epoch_cost.append(pretraining_fns[i](index=batch_index,
+                                              train_set_x=train_features.get_value(borrow=True),
                                  corruption=corruption_levels[i],
                                  lr=pretrain_lr))
                             
@@ -329,7 +332,6 @@ def pretrain_many_sda_sgd(
                     # go through the training set
                     train_features, train_labels = train_reader.read_several()
                     pretraining_fns = pretraining_functions(sda=sda,
-                                                            train_set_x=train_features,
                                                             batch_size=batch_size)
                     n_train_batches = train_features.get_value(borrow=True,
                                                                return_internal_type=True).shape[0] // batch_size
@@ -344,6 +346,7 @@ def pretrain_many_sda_sgd(
                             iter = iter + 1
                         
                             cur_epoch_cost.append(pretraining_fns[i](index=index,
+                                                  train_set=train_features.get_value(borrow=True),
                                      corruption=corruption_levels[i],
                                      lr=pretrain_lr))                            
                         mean_cost = numpy.mean(cur_epoch_cost)                                             

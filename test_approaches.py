@@ -111,8 +111,8 @@ def train_sda_with_log_layer():
     corruption_levels = [0.1, 0.2]
     hidden_layer_sizes = [n_features/2, n_features/3]
     batch_size = 1    
-    train_seq_len = 128
-    test_seq_len = 128
+    train_seq_len = 1
+    test_seq_len = 1
     
     finetune_lr = 0.001
     finetune_epochs = 1

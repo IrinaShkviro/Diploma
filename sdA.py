@@ -88,7 +88,7 @@ class SdA(object):
             if i == 0:
                 layer_input = self.x
             else:
-                layer_input = self.sigmoid_layers[-1].output
+                layer_input = self.sigmoid_layers[-1].output.reshape((-1, input_size))
 
             sigmoid_layer = HiddenLayer(
                 rng=numpy_rng,
@@ -105,7 +105,7 @@ class SdA(object):
             dA_layer = dA(
                 numpy_rng=numpy_rng,
                 theano_rng=theano_rng,
-                input=sigmoid_layer.input,
+                input=layer_input,
                 n_visible=input_size,
                 n_hidden=hidden_layers_sizes[i],
                 W=sigmoid_layer.W,
