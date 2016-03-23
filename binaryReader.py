@@ -89,8 +89,6 @@ class BinaryReader(object):
             data_labels = numpy.concatenate((data_labels, labels))                           
             gc.collect()
         
-        if self.isTrain:
-            print('read several samples: ', len(data_labels))
         set_features = theano.shared(numpy.asarray(data_features,
                                                    dtype=theano.config.floatX),
                                      borrow=True)

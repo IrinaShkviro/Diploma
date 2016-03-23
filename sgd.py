@@ -200,12 +200,11 @@ def train_logistic_sgd(
     classifier.validation = this_validation_loss
     return classifier
     
-def pretraining_functions(sda, batch_size):
+def pretraining_functions(sda, train_set, batch_size):
     # index to a [mini]batch
     index = T.lscalar('index')  # index to a minibatch
     corruption_level = T.scalar('corruption')  # % of corruption to use
     learning_rate = T.scalar('lr')  # learning rate to use
-    train_set_x = T.matrix('train_set')
     
     pretrain_fns = []
     for dA in sda.dA_layers:
@@ -214,20 +213,16 @@ def pretraining_functions(sda, batch_size):
             corruption_level=corruption_level,
             learning_rate=learning_rate
         )
-        print('da_input', dA.x.type)
         # compile the theano function
         fn = theano.function(
             inputs=[
                 index,
-                train_set_x,
                 theano.Param(corruption_level, default=0.2),
                 theano.Param(learning_rate, default=0.01)
             ],
             outputs=cost,
-            #updates=updates,
-            givens={
-                sda.x: train_set_x[index * batch_size: index * batch_size+ batch_size]
-            },
+            updates=updates,
+            givens=[(sda.x, train_set[index * batch_size: index * batch_size+ batch_size])],
             on_unused_input='ignore'
         )
         # append `fn` to the list of functions
@@ -235,56 +230,6 @@ def pretraining_functions(sda, batch_size):
 
     return pretrain_fns
     
-def pretrain_sda_sgd(
-        sda,
-        pretrain_lr,
-        corruption_levels,
-        global_epochs,
-        pat_epochs,
-        batch_size,
-        train_seq_len=20,
-        test_seq_len=40):    
-    
-    ## Pre-train layer-wise
-    for i in xrange(sda.n_layers):
-        cur_dA = sda.dA_layers[i]
-        cur_dA.train_cost_array = []
-        iter = 0
-        for global_epoch in xrange(global_epochs):
-            train_reader = BinaryReader(
-                isTrain=True,
-                len_seqs=train_seq_len
-            )           
-            for patients in xrange(train_reader.n_files):
-                # go through the training set
-                train_features, train_labels = train_reader.read_several()
-                pretraining_fns = pretraining_functions(sda=sda,
-                                                        batch_size=batch_size)
-                n_train_batches = train_features.get_value(borrow=True,
-                                                           return_internal_type=True).shape[0] // batch_size
-                
-                # go through pretraining epochs
-                for pat_epoch in xrange(pat_epochs):
-                    cur_dA.epoch = cur_dA.epoch + 1
-                    cur_epoch_cost=[]                      
-                    for batch_index in xrange(n_train_batches):
-                        # iteration number
-                        iter = iter + 1
-                    
-                        cur_epoch_cost.append(pretraining_fns[i](index=batch_index,
-                                              train_set_x=train_features.get_value(borrow=True),
-                                 corruption=corruption_levels[i],
-                                 lr=pretrain_lr))
-                            
-                    mean_cost = numpy.mean(cur_epoch_cost)                                             
-                    cur_dA.train_cost_array.append([])
-                    cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
-                    cur_dA.train_cost_array[-1].append(mean_cost)
-                    
-            gc.collect()
-                    
-    return sda
-
 def pretrain_many_sda_sgd(
         sda,
         pretrain_lr,
@@ -299,7 +244,10 @@ def pretrain_many_sda_sgd(
     init_folder = 'init_das'
     if not os.path.isdir(init_folder):
         os.makedirs(init_folder)
+    if not os.path.isdir('best_models'):
+        os.makedirs('best_models')
     ## Pre-train layer-wise
+    pretrain_fns_matrix = []
     for i in xrange(sda.n_layers):
         cur_dA = sda.dA_layers[i]
         cur_dA.train_cost_array = []
@@ -312,10 +260,16 @@ def pretrain_many_sda_sgd(
         with open(init_da_name, 'wb') as f:
             pickle.dump(cur_dA, f)
         os.chdir('../')
+        
+        # it is also the best model
+        os.chdir('best_models')
+        init_da_name = ('init_num_%i.pkl')%(i)
+        with open(best_model_name, 'wb') as f:
+            pickle.dump(cur_dA, f)
+        os.chdir('../')
             
         for cur_attempt in xrange(n_attempts):
             iter = 0
-            print('cur_attempt: ', cur_attempt)
             attempt_cost = []
             
             # open clean model
@@ -327,14 +281,20 @@ def pretrain_many_sda_sgd(
                 train_reader = BinaryReader(
                     isTrain=True,
                     len_seqs=train_seq_len
-                )           
-                for patients in xrange(train_reader.n_files):
+                )
+                for seq_num in xrange(train_reader.n_files):
                     # go through the training set
                     train_features, train_labels = train_reader.read_several()
-                    pretraining_fns = pretraining_functions(sda=sda,
+                    if (i == 0):
+                        pretraining_fns = pretraining_functions(sda=sda,
+                                                            train_set = train_features,
                                                             batch_size=batch_size)
-                    n_train_batches = train_features.get_value(borrow=True,
-                                                               return_internal_type=True).shape[0] // batch_size
+                        pretrain_fns_matrix.append(pretraining_fns)
+                    train_features = train_features.get_value(
+                        borrow=True,
+                        return_internal_type=True
+                    )
+                    n_train_batches = train_features.shape[0] // batch_size
                     
                     cur_epoch_cost = []
                     # go through pretraining epochs
@@ -345,11 +305,14 @@ def pretrain_many_sda_sgd(
                             # iteration number
                             iter = iter + 1
                         
-                            cur_epoch_cost.append(pretraining_fns[i](index=index,
-                                                  train_set=train_features.get_value(borrow=True),
-                                     corruption=corruption_levels[i],
-                                     lr=pretrain_lr))                            
-                        mean_cost = numpy.mean(cur_epoch_cost)                                             
+                            cur_epoch_cost.append(
+                                pretrain_fns_matrix[seq_num][i](
+                                    index=index,
+                                    corruption=corruption_levels[i],
+                                    lr=pretrain_lr
+                                )
+                            )                            
+                        mean_cost = numpy.mean(cur_epoch_cost)
                         cur_dA.train_cost_array.append([])
                         cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
                         cur_dA.train_cost_array[-1].append(mean_cost)
@@ -362,8 +325,6 @@ def pretrain_many_sda_sgd(
                 cur_dA.best_cost = best_attempt_cost
                 
                 #save the best model for cur_da
-                if not os.path.isdir('best_models'):
-                        os.makedirs('best_models')                
                 os.chdir('best_models')
                 with open(best_model_name, 'wb') as f:
                     pickle.dump(cur_dA, f)
@@ -456,7 +417,7 @@ def finetune_log_layer_sgd(
         train_reader = BinaryReader(
             isTrain=True,
             len_seqs=train_seq_len
-        )  
+        )
         for pat_num in xrange(train_reader.n_files):
             # go through the training set
             train_features, train_labels = train_reader.read_several()
@@ -532,13 +493,12 @@ def finetune_log_layer_sgd(
     valid_error_array = [] 
     for valid_pat in xrange(valid_reader.n_files):
         valid_features, valid_labels = valid_reader.read_several()
-        valid_error_array.append(validate_model(
-            valid_features.get_value(
-                borrow=True,
-                return_internal_type=True
-            ),
-            valid_labels.eval()
-        ))
+        validate_model = build_finetune_valid(
+            sda=sda,
+            dataset=(valid_features, valid_labels),
+            batch_size=batch_size
+        )
+        valid_error_array.append(numpy.mean(validate_model()))
     valid_mean_error = numpy.mean(valid_error_array)                        
     sda.logLayer.valid_error_array.append([])
     sda.logLayer.valid_error_array[-1].append(float(sda.logLayer.epoch))

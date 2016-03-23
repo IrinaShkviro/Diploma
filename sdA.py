@@ -17,7 +17,6 @@ import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 import pickle
 
-from hiddenLayer import HiddenLayer
 from dA import dA
 from visualizer import visualize_pretraining
 #from cg import pretrain_sda_cg
@@ -56,7 +55,6 @@ class SdA(object):
                                   layer
         """
 
-        self.sigmoid_layers = []
         self.dA_layers = []
         self.params = []
         self.n_layers = len(hidden_layers_sizes)
@@ -88,18 +86,7 @@ class SdA(object):
             if i == 0:
                 layer_input = self.x
             else:
-                layer_input = self.sigmoid_layers[-1].output.reshape((-1, input_size))
-
-            sigmoid_layer = HiddenLayer(
-                rng=numpy_rng,
-                input=layer_input,
-                n_in=input_size,
-                n_out=hidden_layers_sizes[i],
-                activation=T.nnet.sigmoid
-            )
-            # add the layer to our list of layers
-            self.sigmoid_layers.append(sigmoid_layer)
-            self.params.extend(sigmoid_layer.params)
+                layer_input = self.dA_layers[-1].output           
 
             # Construct a denoising autoencoder that shared weights with this layer
             dA_layer = dA(
@@ -107,16 +94,15 @@ class SdA(object):
                 theano_rng=theano_rng,
                 input=layer_input,
                 n_visible=input_size,
-                n_hidden=hidden_layers_sizes[i],
-                W=sigmoid_layer.W,
-                bhid=sigmoid_layer.b
+                n_hidden=hidden_layers_sizes[i]
             )
             
             self.dA_layers.append(dA_layer)
+            self.params.extend(dA_layer.sda_params)
         
         self.logLayer = LogisticRegression(
             rng = numpy.random.RandomState(),
-            input=self.sigmoid_layers[-1].output,
+            input=self.dA_layers[-1].output,
             n_in=hidden_layers_sizes[-1],
             n_out=n_outs
         )
@@ -212,9 +198,15 @@ def finetune_sda(pretrained_sda,
     os.chdir('best_models')
     with open('best_pretrain_sda.pkl', 'wb') as f:
         pickle.dump(pretrained_sda, f)
+    with open('best_sda.pkl', 'wb') as f:
+        pickle.dump(pretrained_sda, f)
+    os.chdir('../')
+    
     best_valid = numpy.inf
     for attempt in xrange(n_attempts):
+        os.chdir('best_models')
         pretrained_sda = pickle.load(open('best_pretrain_sda.pkl'))
+        os.chdir('../')
         
         # train logistic regression layer
         if finetune_algo == 'sgd':    
@@ -234,9 +226,12 @@ def finetune_sda(pretrained_sda,
         if finetuned_sda.logLayer.validation < best_valid:
             best_valid = finetuned_sda.logLayer.validation
             
+            os.chdir('best_models')
             with open('best_sda.pkl', 'wb') as f:
                 pickle.dump(finetuned_sda, f)
-            
+            os.chdir('../')
+    
+    os.chdir('best_models')        
     best_sda = pickle.load(open('best_sda.pkl'))
     os.chdir('../')       
     return best_sda

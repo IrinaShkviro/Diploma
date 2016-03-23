@@ -19,8 +19,8 @@ import theano.tensor as T
 
 
 class HiddenLayer(object):
-    def __init__(self, rng, input, n_in, n_out, W=None, b=None, activation=T.tanh):
-        self.input = input.reshape((-1, n_in))
+    def __init__(self, rng, input, n_in, n_out, batch_size, W=None, b=None, activation=T.tanh):
+        self.input = input.reshape((batch_size, n_in))
         rng.seed()
         if W is None:
             W_values = numpy.asarray(

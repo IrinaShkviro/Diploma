@@ -25,9 +25,10 @@ class dA(object):
         numpy_rng,
         n_visible,
         n_hidden,
-        W,
-        bhid,
-        input,
+        activation=T.tanh,
+        W=None,
+        bhid=None,
+        input=None,
         theano_rng=None,
         bvis=None
     ):
@@ -46,7 +47,25 @@ class dA(object):
         if not theano_rng:
             theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
         
-        if not bvis:
+        if W is None:
+            W_values = numpy.asarray(
+                numpy_rng.uniform(
+                    low=0,
+                    high=0.05,
+                    size=(n_visible, n_hidden)
+                ),
+                dtype=theano.config.floatX
+            )
+            if activation == theano.tensor.nnet.sigmoid:
+                W_values *= 4
+
+            W = theano.shared(value=W_values, name='W', borrow=True)
+            
+        if bhid is None:
+            b_values = numpy.zeros((1, n_hidden), dtype=theano.config.floatX)
+            bhid = theano.shared(value=b_values, name='b', borrow=True, broadcastable=(True, False))
+        
+        if bvis is None:
             bvis_values = numpy.asarray(
                 numpy_rng.uniform(
                     low=0,
@@ -57,6 +76,7 @@ class dA(object):
             )
             bvis = theano.shared(
                 value=bvis_values,
+                name='b_prime',
                 borrow=True,
                 broadcastable=(True, False)
             )
@@ -70,9 +90,14 @@ class dA(object):
         self.W_prime = self.W.T
         self.theano_rng = theano_rng
         
-        self.x = input.reshape((-1, n_visible))
+        self.x = input
 
         self.params = [self.W, self.b, self.b_prime]
+        self.sda_params = [self.W, self.b]
+        
+        self.activation = activation        
+        
+        self.output = self.get_hidden_values(input)
         
         self.train_cost_array=[]
         self.valid_error_array = []
@@ -91,7 +116,14 @@ class dA(object):
 
     def get_hidden_values(self, input):
         """ Computes the values of the hidden layer """
-        return T.nnet.sigmoid(T.dot(input, self.W) + self.b)
+        lin_output = T.dot(input, self.W) + self.b
+        return lin_output
+        '''
+        return (
+            lin_output if self.activation is None
+            else self.activation(lin_output)
+        )
+        '''
 
     def get_reconstructed_input(self, hidden):
         """Computes the reconstructed input given the values of the

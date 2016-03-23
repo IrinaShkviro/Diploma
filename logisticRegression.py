@@ -140,7 +140,7 @@ def train_log_reg(learning_rate,
                  train_seq_len = 20,
                  test_seq_len = 40):
     
-    x = T.matrix('x')
+    x = T.vector('x')
     rng = numpy.random.RandomState()
     classifier = LogisticRegression(
         rng = rng,
