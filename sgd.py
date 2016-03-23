@@ -176,7 +176,6 @@ def train_logistic_sgd(
                         
             gc.collect()
         
-    print('last_iter: ', iter)
     valid_reader = BinaryReader(
         isTrain=False,
         len_seqs=test_seq_len
@@ -237,6 +236,8 @@ def pretrain_many_sda_sgd(
         global_epochs,
         pat_epochs,
         batch_size,
+        debug_folder,
+        debug_file,
         train_seq_len=20,
         test_seq_len=40,
         n_attempts=1):    
@@ -249,6 +250,12 @@ def pretrain_many_sda_sgd(
     ## Pre-train layer-wise
     pretrain_fns_matrix = []
     for i in xrange(sda.n_layers):
+        os.chdir(debug_folder)
+        f = open(debug_file, 'a')
+        f.write('\npretrain_layer: %i\n' % i)
+        f.close()
+        os.chdir('../')        
+        
         cur_dA = sda.dA_layers[i]
         cur_dA.train_cost_array = []
         best_attempt_cost = numpy.inf
@@ -320,8 +327,17 @@ def pretrain_many_sda_sgd(
                         attempt_cost = numpy.concatenate((attempt_cost, cur_epoch_cost))
                         
                 gc.collect()
-            if best_attempt_cost > numpy.mean(attempt_cost):
-                best_attempt_cost = numpy.mean(attempt_cost)
+            
+            mean_attempt_cost = numpy.mean(attempt_cost)
+            os.chdir(debug_folder)
+            f = open(debug_file, 'a')
+            f.write('cur_attempt %i\n' % cur_attempt)
+            f.write('mean_attempt_cost %f\n' % mean_attempt_cost)
+            f.close()
+            os.chdir('../')
+    
+            if best_attempt_cost > mean_attempt_cost:
+                best_attempt_cost = mean_attempt_cost
                 cur_dA.best_cost = best_attempt_cost
                 
                 #save the best model for cur_da
@@ -334,7 +350,6 @@ def pretrain_many_sda_sgd(
         os.chdir('best_models')
         sda.dA_layers[i] = pickle.load(open(best_model_name))
         os.chdir('../')
-    print('finish pretraining')
     return sda
     
 def build_finetune_train(sda, dataset, batch_size, learning_rate):

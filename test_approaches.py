@@ -14,6 +14,9 @@ Created on Fri Feb 26 18:45:48 2016
 '''
 import numpy
 import pickle
+import os
+import timeit
+from datetime import datetime
 
 from logisticRegression import train_log_reg, test_log_reg
 from sdA import train_sda, test_sda
@@ -102,6 +105,14 @@ def train_many_regs():
     print('max value of best error: ', numpy.round(numpy.amax(best_test_errors), 6)) 
 
 def train_sda_with_log_layer():
+    debug_folder = 'sda_debug'
+    if not os.path.isdir(debug_folder):
+        os.makedirs(debug_folder)
+
+    debug_file_name = (('%s')%(datetime.now())).replace(':', '')
+    debug_file_name = debug_file_name.replace('.','')
+    debug_file = ('%s.txt')%(debug_file_name)
+        
     pretrain_algo = 'sgd'
     pretrain_lr = 0.001    
     pretraining_epochs = 1
@@ -119,6 +130,31 @@ def train_sda_with_log_layer():
     finetune_pat_epochs = 1
     finetune_algo = 'sgd'
     finetune_attempts = 1
+    
+    os.chdir(debug_folder)
+    f = open(debug_file, 'w')
+    f.write('PRETRAINING \n')        
+    f.write('pretrain_lr %f\n' % pretrain_lr)
+    f.write('pretraining_epochs %i\n' % pretraining_epochs)
+    f.write('pretraining_pat_epochs %i\n' % pretraining_pat_epochs)
+    f.write('pretrain_attempts %i\n' % pretrain_attempts)
+    
+    f.write('\n SDA \n')        
+    f.write('corruption_levels ')
+    numpy.asarray(corruption_levels).tofile(f)
+    f.write('\n hidden_layer_sizes ')
+    numpy.asarray(hidden_layer_sizes).tofile(f)
+    f.write('\n batch_size %i\n' % batch_size)
+    f.write('train_seq_len %i\n' % train_seq_len)
+    f.write('test_seq_len %i\n' % test_seq_len)
+    
+    f.write('\n FINETUNING \n')        
+    f.write('finetune_lr %f\n' % finetune_lr)
+    f.write('finetune_epochs %i\n' % finetune_epochs)
+    f.write('finetune_pat_epochs %i\n' % finetune_pat_epochs)
+    f.write('finetune_attempts %i\n' % finetune_attempts)
+    f.close()
+    os.chdir('../')
 
     # 3rd approach
     # classifier after autoencoder, long train for single model   
@@ -132,6 +168,8 @@ def train_sda_with_log_layer():
         n_features = n_features,
         n_classes = n_classes,
         batch_size = batch_size,
+        debug_folder = debug_folder,
+        debug_file = debug_file,
         train_seq_len = train_seq_len,
         test_seq_len = test_seq_len,
         finetune_lr = finetune_lr,
@@ -146,9 +184,14 @@ def train_sda_with_log_layer():
         test_seq_len = test_seq_len
     )
     
-    print('mean value of error: ', numpy.round(numpy.mean(test_errors), 6))
-    print('min value of error: ', numpy.round(numpy.amin(test_errors), 6))
-    print('max value of error: ', numpy.round(numpy.amax(test_errors), 6))
+    os.chdir(debug_folder)
+    f = open(debug_file, 'a')
+    f.write('\n TESTING \n') 
+    f.write('mean value of error: %f\n' % numpy.round(numpy.mean(test_errors), 6))
+    f.write('min value of error: %f\n' % numpy.round(numpy.amin(test_errors), 6))
+    f.write('max value of error: %f\n' % numpy.round(numpy.amax(test_errors), 6))
+    f.close()
+    os.chdir('../')
 
 
 if __name__ == '__main__':
