@@ -117,13 +117,11 @@ class dA(object):
     def get_hidden_values(self, input):
         """ Computes the values of the hidden layer """
         lin_output = T.dot(input, self.W) + self.b
-        return lin_output
-        '''
+        
         return (
             lin_output if self.activation is None
             else self.activation(lin_output)
         )
-        '''
 
     def get_reconstructed_input(self, hidden):
         """Computes the reconstructed input given the values of the

@@ -94,7 +94,8 @@ class SdA(object):
                 theano_rng=theano_rng,
                 input=layer_input,
                 n_visible=input_size,
-                n_hidden=hidden_layers_sizes[i]
+                n_hidden=hidden_layers_sizes[i],
+                activation=T.nnet.sigmoid
             )
             
             self.dA_layers.append(dA_layer)
