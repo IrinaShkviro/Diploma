@@ -133,7 +133,8 @@ def train_sda_with_log_layer():
     
     os.chdir(debug_folder)
     f = open(debug_file, 'w')
-    f.write('PRETRAINING \n')        
+    f.write(' MODEL PARAMETERS \n')
+    f.write('\n PRETRAINING \n')        
     f.write('pretrain_lr %f\n' % pretrain_lr)
     f.write('pretraining_epochs %i\n' % pretraining_epochs)
     f.write('pretraining_pat_epochs %i\n' % pretraining_pat_epochs)

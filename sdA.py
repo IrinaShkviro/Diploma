@@ -199,12 +199,20 @@ def finetune_sda(pretrained_sda,
                  train_seq_len,
                  test_seq_len,
                  finetune_algo,
+                 debug_folder,
+                 debug_file,
                  n_attempts = 1):
     os.chdir('best_models')
     with open('best_pretrain_sda.pkl', 'wb') as f:
         pickle.dump(pretrained_sda, f)
     with open('best_sda.pkl', 'wb') as f:
         pickle.dump(pretrained_sda, f)
+    os.chdir('../')
+    
+    os.chdir(debug_folder)
+    f = open(debug_file, 'a')
+    f.write('\n START FINETUNING \n')
+    f.close()
     os.chdir('../')
     
     best_valid = numpy.inf
@@ -227,6 +235,13 @@ def finetune_sda(pretrained_sda,
             
         else:        
             finetuned_sda = pretrained_sda
+        
+        os.chdir(debug_folder)
+        f = open(debug_file, 'a')
+        f.write('attempt: %i, ' % attempt)
+        f.write('valid_error: %f\n' % finetuned_sda.logLayer.validation)
+        f.close()
+        os.chdir('../')
             
         if finetuned_sda.logLayer.validation < best_valid:
             best_valid = finetuned_sda.logLayer.validation
@@ -289,7 +304,9 @@ def train_sda(corruption_levels,
         finetune_pat_epochs = finetune_pat_epochs,
         train_seq_len = train_seq_len,
         test_seq_len = test_seq_len,
-        finetune_algo = finetune_algo
+        finetune_algo = finetune_algo,
+        debug_folder = debug_folder,
+        debug_file = debug_file
     )
     return finetuned_sda
     

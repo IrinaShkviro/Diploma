@@ -242,6 +242,12 @@ def pretrain_many_sda_sgd(
         test_seq_len=40,
         n_attempts=1):    
     
+    os.chdir(debug_folder)
+    f = open(debug_file, 'a')
+    f.write('\n START PRETRAINING \n')
+    f.close()
+    os.chdir('../')    
+        
     init_folder = 'init_das'
     if not os.path.isdir(init_folder):
         os.makedirs(init_folder)
@@ -331,7 +337,7 @@ def pretrain_many_sda_sgd(
             mean_attempt_cost = numpy.mean(attempt_cost)
             os.chdir(debug_folder)
             f = open(debug_file, 'a')
-            f.write('cur_attempt %i\n' % cur_attempt)
+            f.write('cur_attempt %i, ' % cur_attempt)
             f.write('mean_attempt_cost %f\n' % mean_attempt_cost)
             f.close()
             os.chdir('../')
