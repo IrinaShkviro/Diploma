@@ -17,12 +17,7 @@ import os
 from binaryReader import BinaryReader
     
 def training_functions_log_reg_sgd(classifier, batch_size=1):
-    ''' Generates a list of functions, each of them implementing one
-    step in trainnig the dA corresponding to the layer with same index.
-    The function will require as input the minibatch index, and to train
-    a dA you just need to iterate, calling the corresponding function on
-    all minibatch indexes.
-
+    ''' 
     :type train_set_x: theano.tensor.TensorType
     :param train_set_x: Shared variable that contains all datapoints used
                         for training the dA
@@ -47,11 +42,13 @@ def training_functions_log_reg_sgd(classifier, batch_size=1):
     learning_rate = T.scalar('lr')  # learning rate to use
     
     # compute the gradient of cost with respect to theta = (W,b)
-    g_theta = T.grad(cost=cost, wrt=classifier.theta)
+    g_W = T.grad(cost=cost, wrt=classifier.W)
+    g_b = T.grad(cost=cost, wrt=classifier.b)
     
     # specify how to update the parameters of the model as a list of
     # (variable, update expression) pairs.
-    updates = [(classifier.theta, classifier.theta - learning_rate * g_theta)]
+    updates = [(classifier.W, classifier.W - learning_rate * g_W),
+               (classifier.b, classifier.b - learning_rate * g_b)]
     # compiling a Theano function `train_model` that returns the cost, but in
     # the same time updates the parameter of the model based on the rules
     # defined in `updates`
@@ -199,11 +196,12 @@ def train_logistic_sgd(
     classifier.validation = this_validation_loss
     return classifier
     
-def pretraining_functions(sda, train_set, batch_size):
+def pretraining_functions(sda, batch_size):
     # index to a [mini]batch
     index = T.lscalar('index')  # index to a minibatch
     corruption_level = T.scalar('corruption')  # % of corruption to use
     learning_rate = T.scalar('lr')  # learning rate to use
+    train_set = T.matrix('train_set')
     
     pretrain_fns = []
     for dA in sda.dA_layers:
@@ -216,12 +214,15 @@ def pretraining_functions(sda, train_set, batch_size):
         fn = theano.function(
             inputs=[
                 index,
+                train_set,
                 theano.Param(corruption_level, default=0.2),
                 theano.Param(learning_rate, default=0.01)
             ],
             outputs=cost,
             updates=updates,
-            givens=[(sda.x, train_set[index * batch_size: index * batch_size+ batch_size])],
+            givens=[
+                (sda.x, train_set[index * batch_size: index * batch_size+ batch_size])
+            ],
             on_unused_input='ignore'
         )
         # append `fn` to the list of functions
@@ -254,7 +255,10 @@ def pretrain_many_sda_sgd(
     if not os.path.isdir('best_models'):
         os.makedirs('best_models')
     ## Pre-train layer-wise
-    pretrain_fns_matrix = []
+    pretraining_fns = pretraining_functions(
+        sda=sda,
+        batch_size=batch_size
+    )
     for i in xrange(sda.n_layers):
         os.chdir(debug_folder)
         f = open(debug_file, 'a')
@@ -282,6 +286,10 @@ def pretrain_many_sda_sgd(
         os.chdir('../')
             
         for cur_attempt in xrange(n_attempts):
+            train_reader = BinaryReader(
+                isTrain=True,
+                len_seqs=train_seq_len
+            )
             iter = 0
             attempt_cost = []
             
@@ -289,20 +297,12 @@ def pretrain_many_sda_sgd(
             os.chdir(init_folder)
             cur_dA = pickle.load(open(init_da_name))
             os.chdir('../')
+            sda.dA_layers[i] = cur_dA
             
             for global_epoch in xrange(global_epochs):
-                train_reader = BinaryReader(
-                    isTrain=True,
-                    len_seqs=train_seq_len
-                )
                 for seq_num in xrange(train_reader.n_files):
                     # go through the training set
                     train_features, train_labels = train_reader.read_several()
-                    if (i == 0):
-                        pretraining_fns = pretraining_functions(sda=sda,
-                                                            train_set = train_features,
-                                                            batch_size=batch_size)
-                        pretrain_fns_matrix.append(pretraining_fns)
                     train_features = train_features.get_value(
                         borrow=True,
                         return_internal_type=True
@@ -319,8 +319,9 @@ def pretrain_many_sda_sgd(
                             iter = iter + 1
                         
                             cur_epoch_cost.append(
-                                pretrain_fns_matrix[seq_num][i](
+                                pretraining_fns[i](
                                     index=index,
+                                    train_set = train_features,
                                     corruption=corruption_levels[i],
                                     lr=pretrain_lr
                                 )

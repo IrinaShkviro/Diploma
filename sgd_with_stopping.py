@@ -6,8 +6,10 @@ Created on Thu Mar 03 16:08:00 2016
 """
 
 import gc
+import os
 
 import numpy
+import pickle
 
 import theano
 import theano.tensor as T
@@ -15,12 +17,7 @@ import theano.tensor as T
 from binaryReader import BinaryReader
     
 def training_functions_log_reg_sgd(classifier, batch_size=1):
-    ''' Generates a list of functions, each of them implementing one
-    step in trainnig the dA corresponding to the layer with same index.
-    The function will require as input the minibatch index, and to train
-    a dA you just need to iterate, calling the corresponding function on
-    all minibatch indexes.
-
+    ''' 
     :type train_set_x: theano.tensor.TensorType
     :param train_set_x: Shared variable that contains all datapoints used
                         for training the dA
@@ -233,7 +230,7 @@ def train_logistic_sgd(
     classifier.validation = this_validation_loss
     return classifier
     
-def pretraining_functions_sda_sgd(sda, batch_size):
+def pretraining_functions(sda, batch_size):
     ''' Generates a list of functions, each of them implementing one
     step in trainnig the dA corresponding to the layer with same index.
     The function will require as input the minibatch index, and to train
@@ -255,7 +252,6 @@ def pretraining_functions_sda_sgd(sda, batch_size):
     train_set = T.matrix('train_set')
 
     pretrain_fns = []
-    valid_fns = []
     for cur_dA in sda.dA_layers:
         # get the cost and the updates list
         cost, updates = cur_dA.get_cost_updates(
@@ -278,122 +274,183 @@ def pretraining_functions_sda_sgd(sda, batch_size):
             }
         )
         
-        vf = theano.function(
-            inputs=[sda.x, theano.Param(corruption_level, default=0.2)],
-            outputs=cost
-        )
-                
         # append `fn` to the list of functions
         pretrain_fns.append(fn)
-        valid_fns.append(vf)
-
-    return pretrain_fns, valid_fns
+        
+    return pretrain_fns
     
-def pretrain_sda_sgd(
+def pretrain_many_sda_sgd(
         sda,
         pretrain_lr,
         corruption_levels,
         global_epochs,
         pat_epochs,
         batch_size,
+        debug_folder,
+        debug_file,
         train_seq_len=20,
-        test_seq_len=40):    
-    
-    pretraining_fns, valid_fns = pretraining_functions_sda_sgd(sda=sda,
-                                                    batch_size=batch_size)
-
-    validation_frequency = 5000*pat_epochs*global_epochs
+        test_seq_len=40,
+        n_attempts=1):
+            
+    os.chdir(debug_folder)
+    f = open(debug_file, 'a')
+    f.write('\n START PRETRAINING \n')
+    f.close()
+    os.chdir('../')    
+        
+    init_folder = 'init_das'
+    if not os.path.isdir(init_folder):
+        os.makedirs(init_folder)
+    if not os.path.isdir('best_models'):
+        os.makedirs('best_models')
+        
+    pretraining_fns = pretraining_functions(
+        sda=sda,
+        batch_size=batch_size
+    )
     ## Pre-train layer-wise
     for i in xrange(sda.n_layers):
+        os.chdir(debug_folder)
+        f = open(debug_file, 'a')
+        f.write('\npretrain_layer: %i\n' % i)
+        f.close()
+        os.chdir('../')
+        
         cur_dA = sda.dA_layers[i]
         cur_dA.train_cost_array = []
-        iter = 0
-        for global_epoch in xrange(global_epochs):
+        best_attempt_cost = numpy.inf
+        best_model_name = ('best_da_num_%i.pkl')%(i)
+        
+        # save clean model
+        os.chdir(init_folder)
+        init_da_name = ('init_num_%i.pkl')%(i)
+        with open(init_da_name, 'wb') as f:
+            pickle.dump(cur_dA, f)
+        os.chdir('../')
+        
+        # it is also the best model
+        os.chdir('best_models')
+        init_da_name = ('init_num_%i.pkl')%(i)
+        with open(best_model_name, 'wb') as f:
+            pickle.dump(cur_dA, f)
+        os.chdir('../')
+
+        for cur_attempt in xrange(n_attempts):
             train_reader = BinaryReader(
                 isTrain=True,
                 len_seqs=train_seq_len
-            )           
-            for patients in xrange(train_reader.n_files):
-                # go through the training set
-                train_features, train_labels = train_reader.read_several()
-                train_features = train_features.get_value(
-                    borrow=True,
-                    return_internal_type=True
-                )
-                n_train_batches = train_features.shape[0] // batch_size
-                
-                # go through pretraining epochs
-                for pat_epoch in xrange(pat_epochs):
-                    cur_dA.epoch = cur_dA.epoch + 1
-                    cur_epoch_cost=[]                      
-                    for index in xrange(n_train_batches):
-                        # iteration number
-                        iter = iter + 1
-                    
-                        cur_epoch_cost.append(pretraining_fns[i](index=index,
-                                 train_set = train_features,
-                                 corruption=corruption_levels[i],
-                                 lr=pretrain_lr))
-                                 
-                        # test on valid set        
-                        if (iter + 1) % validation_frequency == 0:
-                            valid_reader = BinaryReader(
-                                isTrain=False,
-                                len_seqs=test_seq_len
-                            )
-                            # compute zero-one loss on validation set
-                            valid_error_array = []    
+            )  
+            iter = 0
+            attempt_cost = []
+            best_cost = numpy.inf
             
-                            for seq_index in xrange(valid_reader.n_files):
-                                valid_features, valid_labels = valid_reader.read_several()        
-                                valid_error_array.append(valid_fns[i](
-                                    valid_features.get_value(
-                                        borrow=True,
-                                        return_internal_type=True
-                                    ),
-                                    corruption_levels[i]
-                                ))
-                
-                            this_validation_loss = float(numpy.mean(valid_error_array))*100
-                        
-                            cur_dA.valid_error_array.append([])
-                            cur_dA.valid_error_array[-1].append(
-                                cur_dA.epoch + float(index)/n_train_batches
+            # open clean model
+            os.chdir(init_folder)
+            cur_dA = pickle.load(open(init_da_name))
+            os.chdir('../')
+            sda.dA_layers[i] = cur_dA
+            
+            n_failures = 0
+            done_global_loop = False
+            max_failures = train_reader.n_files
+            global_index = 0    
+            
+            while (global_index < global_epochs) and (not done_global_loop):
+                global_index = global_index + 1
+                pat_num = 0
+                while (pat_num < train_reader.n_files) and (not done_global_loop):
+                    pat_num = pat_num + 1
+                    done_looping = False
+                    # go through the training set
+                    train_features, train_labels = train_reader.read_several()
+                    train_features = train_features.get_value(
+                        borrow=True,
+                        return_internal_type=True
+                    )
+                    n_train_batches = train_features.shape[0] // batch_size
+                    
+                    iter = 0
+                    # early-stopping parameters
+                    improvement_threshold = 0.995  # a relative improvement of this much is
+                                                   # considered significant
+                    n_local_failures = 0
+                    max_local_failures = 3
+                    
+                    validation_frequency = n_train_batches // max_local_failures
+                    validation_increase = 0.2
+                    
+                    cur_epoch_cost = []
+                    pat_epoch=0
+                    # go through pretraining epochs
+                    while (pat_epoch < pat_epochs) and (not done_looping):
+                        pat_epoch = pat_epoch + 1
+
+                        cur_dA.epoch = cur_dA.epoch + 1
+                        cur_epoch_cost=[]                      
+                        for index in xrange(n_train_batches):
+                            # iteration number
+                            iter = iter + 1
+                            cur_cost = pretraining_fns[i](
+                                index=index,
+                                train_set = train_features,
+                                corruption=corruption_levels[i],
+                                lr=pretrain_lr
                             )
-                            cur_dA.valid_error_array[-1].append(this_validation_loss)
+                            cur_epoch_cost.append(cur_cost)
                             
-                            gc.collect()
-                                        
-                    cur_dA.train_cost_array.append([])
-                    cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
-                    cur_dA.train_cost_array[-1].append(numpy.mean(cur_epoch_cost))
-                    
-            gc.collect()
-        
-        cur_dA.epoch = cur_dA.epoch + 1
-        valid_reader = BinaryReader(
-            isTrain=False,
-            len_seqs=test_seq_len
-        )
-        # compute zero-one loss on validation set
-        valid_error_array = []    
-            
-        for seq_index in xrange(valid_reader.n_files):
-            valid_features, valid_labels = valid_reader.read_several()        
-            valid_error_array.append(valid_fns[i](
-                valid_features.get_value(
-                    borrow=True,
-                    return_internal_type=True
-                ),
-                corruption_levels[i]
-            ))
-                
-        this_validation_loss = float(numpy.mean(valid_error_array))*100
+                            if iter % validation_frequency == 0:
+                                # if we got the best validation score until now
+                                if cur_cost < best_cost:
+                                      best_cost = cur_cost
+                                      n_failures = 0
+                                      n_local_failures = 0
+                                      
+                                      #improve patience if loss improvement is good enough
+                                      if cur_cost < best_cost * improvement_threshold:
+                                          validation_frequency = int(validation_frequency * \
+                                              validation_increase)
+                                          max_local_failures = n_train_batches // \
+                                              validation_frequency
+                                else:
+                                    n_local_failures = n_local_failures + 1
+                                    if n_local_failures > max_local_failures:
+                                        done_looping = True
+                                        n_failures = n_failures + 1
+                                        if n_failures > max_failures:
+                                            done_global_loop = True
+                                        break
+                            
+                        mean_cost = numpy.mean(cur_epoch_cost)                                                       
+                        cur_dA.train_cost_array.append([])
+                        cur_dA.train_cost_array[-1].append(float(cur_dA.epoch))
+                        cur_dA.train_cost_array[-1].append(mean_cost)
                         
-        cur_dA.valid_error_array.append([])
-        cur_dA.valid_error_array[-1].append(float(cur_dA.epoch))
-        cur_dA.valid_error_array[-1].append(this_validation_loss)
+                    attempt_cost = numpy.concatenate((attempt_cost, cur_epoch_cost))
+                        
+                gc.collect()
             
+            mean_attempt_cost = numpy.mean(attempt_cost)         
+            os.chdir(debug_folder)
+            f = open(debug_file, 'a')
+            f.write('cur_attempt %i, ' % cur_attempt)
+            f.write('mean_attempt_cost %f\n' % mean_attempt_cost)
+            f.close()
+            os.chdir('../')
+            
+            if best_attempt_cost > mean_attempt_cost:
+                best_attempt_cost = mean_attempt_cost
+                cur_dA.best_cost = best_attempt_cost
+                
+                #save the best model for cur_da
+                os.chdir('best_models')
+                with open(best_model_name, 'wb') as f:
+                    pickle.dump(cur_dA, f)
+                os.chdir('../')
+                
+        # load the best model in sda
+        os.chdir('best_models')
+        sda.dA_layers[i] = pickle.load(open(best_model_name))
+        os.chdir('../')            
     return sda
     
 def build_finetune_functions(sda, batch_size, learning_rate):
