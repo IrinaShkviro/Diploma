@@ -36,7 +36,7 @@ class SdA(object):
         corruption_levels=[0.1, 0.1],
         theano_rng=None
     ):
-        """ This class is made to support a variable number of layers.
+        '''
         :type numpy_rng: numpy.random.RandomState
         :param numpy_rng: numpy random number generator used to draw initial
                     weights
@@ -45,15 +45,17 @@ class SdA(object):
                            generated based on a seed drawn from `rng`
         :type n_ins: int
         :param n_ins: dimension of the input to the sdA
+        
         :type n_layers_sizes: list of ints
         :param n_layers_sizes: intermediate layers size, must contain
                                at least one value
         :type n_outs: int
         :param n_outs: dimension of the output of the network
+        
         :type corruption_levels: list of float
         :param corruption_levels: amount of corruption to use for each
                                   layer
-        """
+        '''
 
         self.dA_layers = []
         self.params = []

@@ -141,11 +141,9 @@ def train_sda_with_log_layer():
     f.write('pretrain_attempts %i\n' % pretrain_attempts)
     
     f.write('\n SDA \n')        
-    f.write('corruption_levels ')
-    numpy.asarray(corruption_levels).tofile(f)
-    f.write('\n hidden_layer_sizes ')
-    numpy.asarray(hidden_layer_sizes).tofile(f)
-    f.write('\n batch_size %i\n' % batch_size)
+    f.write('corruption_levels: [%s]\n' % ', '.join(map(str, corruption_levels)))
+    f.write('hidden_layer_sizes:  [%s]\n' % ', '.join(map(str, hidden_layer_sizes)))
+    f.write('batch_size %i\n' % batch_size)
     f.write('train_seq_len %i\n' % train_seq_len)
     f.write('test_seq_len %i\n' % test_seq_len)
     

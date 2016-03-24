@@ -377,12 +377,8 @@ def build_finetune_train(sda, dataset, batch_size, learning_rate):
         outputs=[sda.finetune_cost, sda.errors],
         updates=updates,
         givens={
-            sda.x: train_set_x[
-                index * batch_size: (index + 1) * batch_size
-            ],
-            sda.y: train_set_y[
-                index * batch_size: (index + 1) * batch_size
-            ]
+            sda.x: train_set_x[index * batch_size: (index + 1) * batch_size],
+            sda.y: train_set_y[index * batch_size: (index + 1) * batch_size]
         },
         name='train'
     )
@@ -403,12 +399,8 @@ def build_finetune_valid(sda, dataset, batch_size):
         [index],
         sda.errors,
         givens={
-            sda.x: valid_set_x[
-                index * batch_size: (index + 1) * batch_size
-            ],
-            sda.y: valid_set_y[
-                index * batch_size: (index + 1) * batch_size
-            ]
+            sda.x: valid_set_x[index * batch_size: (index + 1) * batch_size],
+            sda.y: valid_set_y[index * batch_size: (index + 1) * batch_size]
         },
         name='valid'
     )

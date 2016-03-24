@@ -5,10 +5,6 @@ Created on Fri Feb 19 12:17:32 2016
 @author: irina
 """
 
-import os
-import sys
-import time
-
 import numpy
 
 import theano
@@ -32,14 +28,14 @@ class dA(object):
         theano_rng=None,
         bvis=None
     ):
-        """
+        '''
         :type numpy_rng: numpy.random.RandomState
         :param numpy_rng: number random generator used to generate weights
 
         :type theano_rng: theano.tensor.shared_randomstreams.RandomStreams
         :param theano_rng: Theano random generator; if None is given one is
                      generated based on a seed drawn from `rng`
-        """
+        '''
         self.n_visible = n_visible
         self.n_hidden = n_hidden
 
@@ -105,8 +101,8 @@ class dA(object):
         self.best_cost = numpy.inf
 
     def get_corrupted_input(self, input, corruption_level):
-        """ This function keeps ``1-corruption_level`` entries of the inputs the
-        same and zero-out randomly selected subset of size ``coruption_level`` """
+        ''' Keeps ``1-corruption_level`` entries of the inputs the same and
+        zero-out randomly selected subset of size ``coruption_level``  '''
         return self.theano_rng.binomial(
             size=input.shape,
             n=1,
@@ -115,25 +111,19 @@ class dA(object):
         ) * input
 
     def get_hidden_values(self, input):
-        """ Computes the values of the hidden layer """
-        lin_output = T.dot(input, self.W) + self.b
-        
+        ''' Computes the values of the hidden layer '''
+        lin_output = T.dot(input, self.W) + self.b        
         return (
             lin_output if self.activation is None
             else self.activation(lin_output)
         )
 
     def get_reconstructed_input(self, hidden):
-        """Computes the reconstructed input given the values of the
-        hidden layer
-
-        """
-        return T.nnet.sigmoid(T.dot(hidden, self.W_prime) + self.b_prime)
+        ''' Computes the reconstructed input given the values of the hidden layer '''
+        return self.activation(T.dot(hidden, self.W_prime) + self.b_prime)
         
     def get_cost_updates(self, corruption_level, learning_rate):
-        """ This function computes the cost and the updates for one trainng
-        step of the dA """
-
+        ''' Computes the cost and the updates for one trainng step of the dA '''
         tilde_x = self.get_corrupted_input(self.x, corruption_level)
         y = self.get_hidden_values(tilde_x)
         z = self.get_reconstructed_input(y)
@@ -151,15 +141,3 @@ class dA(object):
         ]
 
         return (cost, updates)
-        
-    def predict(self):
-        """
-        Return predicted vector
-        """
-        return self.z
-    
-    def actual(self):
-        """
-        Return actual vector
-        """
-        return self.x    

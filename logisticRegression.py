@@ -20,10 +20,10 @@ from visualizer import vis_log_reg
 
 class LogisticRegression(object):
     def __init__(self, rng, input, n_in, n_out):
-        """
+        '''
         :type rng: numpy.random.RandomState
         :param rng: a random number generator used to initialize weights
-        """
+        '''
         
         self.input = input
         self.n_in = n_in
@@ -75,30 +75,21 @@ class LogisticRegression(object):
         # parameters of the model
         self.params = [self.W, self.b]
         
-        self.input = input
-        
         self.valid_error_array = []
         self.train_cost_array = []
         self.train_error_array = []
         self.epoch = 0
         self.validation = numpy.inf
         
-    def print_log_reg_types(self):
-        print(self.W.type(), 'W')
-        print(self.b.type(), 'b')
-        print(self.p_y_given_x.type(), 'p_y_given_x')
-        print(self.y_pred.type(), 'y_pred')
-        
-
     def negative_log_likelihood(self, y):
-        """
+        '''
         Return the negative log-likelihood of the prediction
         of this model under a given target distribution.
 
         :type y: theano.tensor.TensorType
         :param y: corresponds to a number that gives for each example the
                   correct label
-        """
+        '''
         # y.shape[0] is (symbolically) the number of rows in y, i.e.,
         # number of examples (call it n) in the minibatch
         # T.arange(y.shape[0]) is a symbolic vector which will contain
@@ -113,9 +104,7 @@ class LogisticRegression(object):
         return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
             
     def predict(self):
-        """
-        Return predicted y
-        """
+        ''' Return predicted y '''
         return self.y_pred
         
     def distribution(self):
