@@ -20,7 +20,7 @@ import pickle
 from dA import dA
 from visualizer import visualize_pretraining
 #from cg import pretrain_sda_cg
-from sgd import pretrain_many_sda_sgd, finetune_log_layer_sgd
+from sgd_with_stopping import pretrain_many_sda_sgd, finetune_log_layer_sgd
 from logisticRegression import LogisticRegression
 from binaryReader import BinaryReader
 

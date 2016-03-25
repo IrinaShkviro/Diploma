@@ -369,7 +369,6 @@ def pretrain_many_sda_sgd(
                     )
                     n_train_batches = train_features.shape[0] // batch_size
                     
-                    iter = 0
                     # early-stopping parameters
                     improvement_threshold = 0.995  # a relative improvement of this much is
                                                    # considered significant
@@ -474,20 +473,21 @@ def build_finetune_functions(sda, batch_size, learning_rate):
             train_set_x,
             train_set_y
         ],
-        outputs=sda.finetune_cost,
+        outputs=[sda.finetune_cost, sda.errors],
         updates=updates,
         givens={
             sda.x: train_set_x[index * batch_size: (index + 1) * batch_size],
             sda.y: train_set_y[index * batch_size: (index + 1) * batch_size]
-        }
+        },
+        name='train'
     )
 
-    test_score = theano.function(
+    valid_fn = theano.function(
         inputs=[sda.x, sda.y],
         outputs=[sda.errors]
     )
 
-    return train_fn, test_score
+    return train_fn, valid_fn
     
 def finetune_log_layer_sgd(
     sda,
@@ -502,21 +502,34 @@ def finetune_log_layer_sgd(
     ########################
 
     # get the training, validation and testing functions for the model
-    train_fn, validate_model = build_finetune_functions(
+    train_fn, valid_fn = build_finetune_functions(
         sda=sda,
         batch_size=batch_size,
         learning_rate=finetune_lr
     )
     
+    train_reader = BinaryReader(
+        isTrain=True,
+        len_seqs=train_seq_len
+    ) 
+    
+    best_validation_loss = numpy.inf
+        
+    n_failures = 0
+    done_global_loop = False
+    max_failures = train_reader.n_files
+    global_index = 0
+    
     iter = 0
     validation_frequency = 5000*pat_epochs*global_epochs
 
-    for global_epoch in xrange(global_epochs):
-        train_reader = BinaryReader(
-            isTrain=True,
-            len_seqs=train_seq_len
-        )  
-        for pat_num in xrange(train_reader.n_files):
+    while (global_index < global_epochs) and (not done_global_loop):
+        global_index = global_index + 1
+        pat_num = 0
+        while (pat_num < train_reader.n_files) and (not done_global_loop):
+            pat_num = pat_num + 1
+            done_looping = False
+            
             # go through the training set
             train_features, train_labels = train_reader.read_several()
             train_features = train_features.get_value(
@@ -526,14 +539,24 @@ def finetune_log_layer_sgd(
             train_labels = train_labels.eval()
             n_train_batches = train_features.shape[0] // batch_size
             
+            # early-stopping parameters
+            improvement_threshold = 0.995  # a relative improvement of this much is
+                                           # considered significant
+            n_local_failures = 0
+            max_local_failures = 3
+            
+            validation_frequency = n_train_batches // max_local_failures
+            validation_increase = 0.2
+            
             pat_epoch = 0    
-            while (pat_epoch < pat_epochs):
+            while (pat_epoch < pat_epochs) and (not done_looping):
                 pat_epoch = pat_epoch + 1
                 sda.logLayer.epoch = sda.logLayer.epoch + 1
+                
                 cur_train_cost = []
                 cur_train_error = []
                 for batch_index in xrange(n_train_batches):          
-                    sample_cost, sample_error, cur_pred, cur_actual = train_fn(
+                    sample_cost, sample_error = train_fn(
                         index = batch_index,
                         train_set_x = train_features,
                         train_set_y = train_labels
@@ -554,19 +577,41 @@ def finetune_log_layer_sgd(
                         valid_error_array = [] 
                         for valid_pat in xrange(valid_reader.n_files):
                             valid_features, valid_labels = valid_reader.read_several()
-                            valid_error_array.append(validate_model(
+                            valid_error_array.append(valid_fn(
                                 valid_features.get_value(
                                     borrow=True,
                                     return_internal_type=True
                                 ),
                                 valid_labels.eval()
                             ))
-                        valid_mean_error = numpy.mean(valid_error_array)                        
+                        this_validation_loss = numpy.mean(valid_error_array) *100                       
                         sda.logLayer.valid_error_array.append([])
                         sda.logLayer.valid_error_array[-1].append(
                             sda.logLayer.epoch + float(batch_index)/n_train_batches
                         )
-                        sda.logLayer.valid_error_array[-1].append(valid_mean_error)
+                        sda.logLayer.valid_error_array[-1].append(this_validation_loss)
+                        
+                        # if we got the best validation score until now
+                        if this_validation_loss < best_validation_loss:
+                              best_validation_loss = this_validation_loss
+                              n_failures = 0
+                              n_local_failures = 0                              
+                              
+                              #improve patience if loss improvement is good enough
+                              if this_validation_loss < best_validation_loss *  \
+                              improvement_threshold:
+                                  validation_frequency = int(validation_frequency * \
+                                      validation_increase)
+                                  max_local_failures = n_train_batches // \
+                                      validation_frequency
+                        else:
+                            n_local_failures = n_local_failures + 1
+                            if n_local_failures > max_local_failures:
+                                done_looping = True
+                                n_failures = n_failures + 1
+                                if n_failures > max_failures:
+                                    done_global_loop = True
+                                break
                         
                         gc.collect()
                                                           
@@ -589,14 +634,14 @@ def finetune_log_layer_sgd(
     valid_error_array = [] 
     for valid_pat in xrange(valid_reader.n_files):
         valid_features, valid_labels = valid_reader.read_several()
-        valid_error_array.append(validate_model(
+        valid_error_array.append(valid_fn(
             valid_features.get_value(
                 borrow=True,
                 return_internal_type=True
             ),
             valid_labels.eval()
         ))
-    valid_mean_error = numpy.mean(valid_error_array)                        
+    valid_mean_error = numpy.mean(valid_error_array)*100                      
     sda.logLayer.valid_error_array.append([])
     sda.logLayer.valid_error_array[-1].append(float(sda.logLayer.epoch))
     sda.logLayer.valid_error_array[-1].append(valid_mean_error)
