@@ -105,9 +105,9 @@ def train_many_regs():
     print('max value of best error: ', numpy.round(numpy.amax(best_test_errors), 6)) 
 
 def train_sda_with_log_layer():
-    debug_folder = 'sda_debug'
-    if not os.path.isdir(debug_folder):
-        os.makedirs(debug_folder)
+    if not os.path.isdir('debug_info'):
+        os.makedirs('debug_info')
+    os.chdir('debug_info')
 
     debug_file_name = (('%s')%(datetime.now())).replace(':', '')
     debug_file_name = debug_file_name.replace('.','')
@@ -116,21 +116,24 @@ def train_sda_with_log_layer():
     pretrain_algo = 'sgd'
     pretrain_lr = 0.001    
     pretraining_epochs = 1
-    pretraining_pat_epochs = 1
+    pretraining_pat_epochs = 200
     pretrain_attempts = 1
     
     corruption_levels = [0.1, 0.2]
     hidden_layer_sizes = [n_features/2, n_features/3]
-    batch_size = 1    
-    train_seq_len = 1
-    test_seq_len = 1
+    batch_size = 1000
+    train_seq_len = 500
+    test_seq_len = 500
     
     finetune_lr = 0.001
     finetune_epochs = 1
     finetune_pat_epochs = 1
     finetune_algo = 'sgd'
-    finetune_attempts = 1
+    finetune_attempts = 1    
     
+    debug_folder = (('fast_pretrain lr %f, bs %i')%(pretrain_lr, batch_size))
+    if not os.path.isdir(debug_folder):
+        os.makedirs(debug_folder)
     os.chdir(debug_folder)
     f = open(debug_file, 'w')
     f.write(' MODEL PARAMETERS \n')
@@ -178,6 +181,7 @@ def train_sda_with_log_layer():
         pretrain_attempts = pretrain_attempts,
         finetune_attempts = finetune_attempts
     )
+    '''
     test_errors = test_sda (
         sda = trained_sda,
         test_seq_len = test_seq_len
@@ -190,6 +194,8 @@ def train_sda_with_log_layer():
     f.write('min value of error: %f\n' % numpy.round(numpy.amin(test_errors), 6))
     f.write('max value of error: %f\n' % numpy.round(numpy.amax(test_errors), 6))
     f.close()
+    os.chdir('../')
+    '''
     os.chdir('../')
 
 

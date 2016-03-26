@@ -205,8 +205,6 @@ def finetune_sda(pretrained_sda,
                  debug_file,
                  n_attempts = 1):
     os.chdir('best_models')
-    with open('best_pretrain_sda.pkl', 'wb') as f:
-        pickle.dump(pretrained_sda, f)
     with open('best_sda.pkl', 'wb') as f:
         pickle.dump(pretrained_sda, f)
     os.chdir('../')
@@ -297,6 +295,7 @@ def train_sda(corruption_levels,
         test_seq_len = test_seq_len,
         n_attempts = pretrain_attempts
     )
+    '''
     # train logistic regression layer
     finetuned_sda = finetune_sda(
         pretrained_sda = pretrained_sda,
@@ -310,7 +309,8 @@ def train_sda(corruption_levels,
         debug_folder = debug_folder,
         debug_file = debug_file
     )
-    return finetuned_sda
+    '''
+    return pretrained_sda
     
 def test_sda(sda, test_seq_len = 1):
     

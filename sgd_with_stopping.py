@@ -376,7 +376,7 @@ def pretrain_many_sda_sgd(
                     max_local_failures = 3
                     
                     validation_frequency = n_train_batches // max_local_failures
-                    validation_increase = 0.2
+                    validation_increase = 0.02
                     
                     cur_epoch_cost = []
                     pat_epoch=0
@@ -408,6 +408,8 @@ def pretrain_many_sda_sgd(
                                       if cur_cost < best_cost * improvement_threshold:
                                           validation_frequency = int(validation_frequency * \
                                               validation_increase)
+                                          if validation_frequency == 0:
+                                                 validation_frequency = 1000
                                           max_local_failures = n_train_batches // \
                                               validation_frequency
                                 else:
@@ -449,7 +451,12 @@ def pretrain_many_sda_sgd(
         # load the best model in sda
         os.chdir('best_models')
         sda.dA_layers[i] = pickle.load(open(best_model_name))
-        os.chdir('../')            
+        os.chdir('../')
+    
+    os.chdir('best_models')
+    with open('best_pretrain_sda.pkl', 'wb') as f:
+        pickle.dump(sda, f)
+    os.chdir('../')            
     return sda
     
 def build_finetune_functions(sda, batch_size, learning_rate):

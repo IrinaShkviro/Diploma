@@ -30,12 +30,15 @@ class BinaryReader(object):
         self.sequence_index = 0
         self.isTrain = isTrain
         self.len_seqs = len_seqs
+        os.chdir('../')
         # path to folder with data
         if isTrain:
             dataset = './data/phones39/train' 
         else:
-            dataset = './data/phones39/test' 
+            dataset = './data/phones39/test'
+        dataset = os.path.abspath(dataset)
         self.init_sequence(dataset)
+        os.chdir('debug_info')
     
     # read all docs in sequence
     def read_all(self):
@@ -110,8 +113,7 @@ class BinaryReader(object):
             self.sequence_files.append(sequence_file)
             
     # define current file for reading
-    def get_sequence(self):
-        
+    def get_sequence(self):        
         if self.sequence_index>=len(self.sequence_files):
             self.sequence_index = 0
         sequence_file = self.sequence_files[self.sequence_index]
@@ -119,8 +121,7 @@ class BinaryReader(object):
         return self.read_sequence(sequence_file)
         
     #read sequence_file and return array of features and vector with labels
-    def read_sequence(self, sequence_file):
-        
+    def read_sequence(self, sequence_file):        
         filesize = os.path.getsize(sequence_file)
         n_samples = filesize/(4*(self.n_features + 1))
         
