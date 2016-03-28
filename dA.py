@@ -96,7 +96,6 @@ class dA(object):
         self.output = self.get_hidden_values(input)
         
         self.train_cost_array=[]
-        self.valid_error_array = []
         self.epoch=0
         self.best_cost = numpy.inf
 

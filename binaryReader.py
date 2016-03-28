@@ -38,7 +38,7 @@ class BinaryReader(object):
             dataset = './data/phones39/test'
         dataset = os.path.abspath(dataset)
         self.init_sequence(dataset)
-        os.chdir('debug_info')
+        os.chdir('long_debug_info')
     
     # read all docs in sequence
     def read_all(self):

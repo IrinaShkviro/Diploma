@@ -34,6 +34,7 @@ class SdA(object):
         n_outs,
         hidden_layers_sizes,
         corruption_levels=[0.1, 0.1],
+        activations = [T.nnet.sigmoid, T.nnet.sigmoid],
         theano_rng=None
     ):
         '''
@@ -97,7 +98,7 @@ class SdA(object):
                 input=layer_input,
                 n_visible=input_size,
                 n_hidden=hidden_layers_sizes[i],
-                activation=T.nnet.sigmoid
+                activation=activations[i]
             )
             
             self.dA_layers.append(dA_layer)
@@ -120,8 +121,8 @@ def pretrain_SdA(corruption_levels,
                  pretrain_lr,
                  pretrain_algo,
                  hidden_layers_sizes,
+                 activations,
                  output_folder,
-                 base_folder,
                  debug_folder,
                  debug_file,
                  n_features,
@@ -144,6 +145,7 @@ def pretrain_SdA(corruption_levels,
         n_outs = n_classes,
         hidden_layers_sizes = hidden_layers_sizes,
         corruption_levels = corruption_levels,
+        activations = activations,
         theano_rng = None
     )
         
@@ -177,19 +179,18 @@ def pretrain_SdA(corruption_levels,
             preprocess_algo = pretrain_algo,
             read_window = read_window
         )
-                             
-        for i in xrange(sda.n_layers):
+    '''                         
+    for i in xrange(sda.n_layers):
         visualize_pretraining(
             train_cost = pretrained_sda.dA_layers[i].train_cost_array,
-            valid_error = pretrained_sda.dA_layers[i].valid_error_array,
             learning_rate = pretrain_lr,
             corruption_level = corruption_levels[i],
             n_hidden = sda.dA_layers[i].n_hidden,
             da_layer = i,
             datasets_folder = output_folder,
-            base_folder = base_folder
+            base_folder = debug_folder
         )
-    '''
+    
     gc.collect()
     return pretrained_sda
 
@@ -261,6 +262,7 @@ def train_sda(corruption_levels,
               pretraining_pat_epochs,
               pretrain_lr,
               hidden_layer_sizes,
+              activations,
               pretrain_algo,
               n_features,
               n_classes,
@@ -276,7 +278,6 @@ def train_sda(corruption_levels,
               pretrain_attempts = 1,
               finetune_attempts = 1
               ):
-    base_folder = 'sda_log_reg'
     pretrained_sda = pretrain_SdA(
         corruption_levels = corruption_levels,
         pretraining_epochs = pretraining_epochs,
@@ -284,8 +285,8 @@ def train_sda(corruption_levels,
         pretrain_lr = pretrain_lr,        
         pretrain_algo = pretrain_algo,
         hidden_layers_sizes = hidden_layer_sizes,
-        output_folder = ('pretrain_sda_%s')%(pretrain_algo),
-        base_folder = base_folder,
+        activations = activations,
+        output_folder = 'vis_pretrain',
         debug_folder = debug_folder,
         debug_file = debug_file,
         n_features = n_features,

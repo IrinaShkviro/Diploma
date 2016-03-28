@@ -15,7 +15,8 @@ Created on Fri Feb 26 18:45:48 2016
 import numpy
 import pickle
 import os
-import timeit
+import theano.tensor as T
+
 from datetime import datetime
 
 from logisticRegression import train_log_reg, test_log_reg
@@ -105,25 +106,27 @@ def train_many_regs():
     print('max value of best error: ', numpy.round(numpy.amax(best_test_errors), 6)) 
 
 def train_sda_with_log_layer():
-    if not os.path.isdir('debug_info'):
-        os.makedirs('debug_info')
-    os.chdir('debug_info')
+    approach_folder = 'long_debug_info'
+    if not os.path.isdir(approach_folder):
+        os.makedirs(approach_folder)
+    os.chdir(approach_folder)
 
     debug_file_name = (('%s')%(datetime.now())).replace(':', '')
     debug_file_name = debug_file_name.replace('.','')
     debug_file = ('%s.txt')%(debug_file_name)
         
     pretrain_algo = 'sgd'
-    pretrain_lr = 0.001    
+    pretrain_lr = 0.1    
     pretraining_epochs = 1
-    pretraining_pat_epochs = 200
+    pretraining_pat_epochs = 1000
     pretrain_attempts = 1
     
     corruption_levels = [0.1, 0.2]
     hidden_layer_sizes = [n_features/2, n_features/3]
-    batch_size = 1000
-    train_seq_len = 500
-    test_seq_len = 500
+    activations = [T.nnet.sigmoid, T.nnet.softmax]
+    batch_size = 128
+    train_seq_len = 128
+    test_seq_len = 128
     
     finetune_lr = 0.001
     finetune_epochs = 1
@@ -131,7 +134,7 @@ def train_sda_with_log_layer():
     finetune_algo = 'sgd'
     finetune_attempts = 1    
     
-    debug_folder = (('fast_pretrain lr %f, bs %i')%(pretrain_lr, batch_size))
+    debug_folder = (('pretrain lr %f, bs %i')%(pretrain_lr, batch_size))
     if not os.path.isdir(debug_folder):
         os.makedirs(debug_folder)
     os.chdir(debug_folder)
@@ -146,6 +149,7 @@ def train_sda_with_log_layer():
     f.write('\n SDA \n')        
     f.write('corruption_levels: [%s]\n' % ', '.join(map(str, corruption_levels)))
     f.write('hidden_layer_sizes:  [%s]\n' % ', '.join(map(str, hidden_layer_sizes)))
+    f.write('activations:  [%s]\n' % ', '.join(map(str, activations)))
     f.write('batch_size %i\n' % batch_size)
     f.write('train_seq_len %i\n' % train_seq_len)
     f.write('test_seq_len %i\n' % test_seq_len)
@@ -166,6 +170,7 @@ def train_sda_with_log_layer():
         pretraining_pat_epochs = pretraining_pat_epochs,
         pretrain_lr = pretrain_lr,
         hidden_layer_sizes = hidden_layer_sizes,
+        activations = activations,
         pretrain_algo = pretrain_algo,
         n_features = n_features,
         n_classes = n_classes,

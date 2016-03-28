@@ -70,7 +70,6 @@ def vis_log_reg(base_folder,
     os.chdir('../')
 
 def visualize_pretraining(train_cost,
-                          valid_error,
                           learning_rate,
                           corruption_level,
                           n_hidden,
@@ -86,12 +85,10 @@ def visualize_pretraining(train_cost,
         os.chdir(datasets_folder)
                                 
         train_cost=numpy.asarray(train_cost)
-        valid_error=numpy.asarray(valid_error)
         
         # print errors
         plt.figure(1)
         plt.plot(train_cost[:, 0],train_cost[:,1],label='train_cost')
-        plt.plot(valid_error[:, 0],valid_error[:,1],label='valid_error')
         
         # decorative part       
         plt.xlabel('epochs')

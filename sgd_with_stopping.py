@@ -319,7 +319,7 @@ def pretrain_many_sda_sgd(
         cur_dA = sda.dA_layers[i]
         cur_dA.train_cost_array = []
         best_attempt_cost = numpy.inf
-        best_model_name = ('best_da_num_%i.pkl')%(i)
+        best_model_name = ('best_da_%i.pkl')%(i)
         
         # save clean model
         os.chdir(init_folder)
@@ -330,7 +330,6 @@ def pretrain_many_sda_sgd(
         
         # it is also the best model
         os.chdir('best_models')
-        init_da_name = ('init_num_%i.pkl')%(i)
         with open(best_model_name, 'wb') as f:
             pickle.dump(cur_dA, f)
         os.chdir('../')
@@ -377,6 +376,8 @@ def pretrain_many_sda_sgd(
                     
                     validation_frequency = n_train_batches // max_local_failures
                     validation_increase = 0.02
+                    if validation_frequency == 0:
+                        validation_frequency = n_train_batches
                     
                     cur_epoch_cost = []
                     pat_epoch=0
@@ -409,9 +410,11 @@ def pretrain_many_sda_sgd(
                                           validation_frequency = int(validation_frequency * \
                                               validation_increase)
                                           if validation_frequency == 0:
-                                                 validation_frequency = 1000
-                                          max_local_failures = n_train_batches // \
-                                              validation_frequency
+                                              validation_frequency = n_train_batches
+                                              max_local_failures = 2
+                                          else:
+                                              max_local_failures = n_train_batches // \
+                                                  validation_frequency
                                 else:
                                     n_local_failures = n_local_failures + 1
                                     if n_local_failures > max_local_failures:
