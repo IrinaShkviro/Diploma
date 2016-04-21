@@ -20,7 +20,7 @@ import theano.tensor as T
 from datetime import datetime
 
 from logisticRegression import train_log_reg, test_log_reg
-from sdA import train_sda, test_sda
+from sdA import train_sda, test_sda, finetune_sda
 
 #define some shared constants
 n_features = 75
@@ -121,20 +121,20 @@ def train_sda_with_log_layer():
     pretraining_pat_epochs = 1000
     pretrain_attempts = 1
     
-    corruption_levels = [0.1, 0.2]
-    hidden_layer_sizes = [n_features/2, n_features/3]
-    activations = [T.nnet.sigmoid, T.nnet.softmax]
-    batch_size = 128
-    train_seq_len = 128
-    test_seq_len = 128
+    corruption_levels = [0.1]
+    hidden_layer_sizes = [200]
+    activations = [T.nnet.sigmoid]
+    batch_size = 1000
+    train_seq_len = 500
+    test_seq_len = 500
     
     finetune_lr = 0.001
     finetune_epochs = 1
-    finetune_pat_epochs = 1
+    finetune_pat_epochs = 1000
     finetune_algo = 'sgd'
     finetune_attempts = 1    
     
-    debug_folder = (('pretrain lr %f, bs %i')%(pretrain_lr, batch_size))
+    debug_folder = (('finetune lr %f, bs %i')%(finetune_lr, batch_size))
     if not os.path.isdir(debug_folder):
         os.makedirs(debug_folder)
     os.chdir(debug_folder)
@@ -161,32 +161,28 @@ def train_sda_with_log_layer():
     f.write('finetune_attempts %i\n' % finetune_attempts)
     f.close()
     os.chdir('../')
+    
+    os.chdir('best_models')
+    pretrained_sda = pickle.load(open('best_pretrain_sda.pkl'))
+    os.chdir('../')
 
     # 3rd approach
     # classifier after autoencoder, long train for single model   
-    trained_sda = train_sda(
-        corruption_levels = corruption_levels,
-        pretraining_epochs = pretraining_epochs,
-        pretraining_pat_epochs = pretraining_pat_epochs,
-        pretrain_lr = pretrain_lr,
-        hidden_layer_sizes = hidden_layer_sizes,
-        activations = activations,
-        pretrain_algo = pretrain_algo,
-        n_features = n_features,
-        n_classes = n_classes,
+    trained_sda = finetune_sda(
+        pretrained_sda = pretrained_sda,
         batch_size = batch_size,
-        debug_folder = debug_folder,
-        debug_file = debug_file,
-        train_seq_len = train_seq_len,
-        test_seq_len = test_seq_len,
         finetune_lr = finetune_lr,
         finetune_epochs = finetune_epochs,
         finetune_pat_epochs = finetune_pat_epochs,
+        train_seq_len = train_seq_len,
+        test_seq_len = test_seq_len,
         finetune_algo = finetune_algo,
-        pretrain_attempts = pretrain_attempts,
-        finetune_attempts = finetune_attempts
+        debug_folder = debug_folder,
+        debug_file = debug_file,
+        n_attempts = finetune_attempts
     )
-    '''
+
+    
     test_errors = test_sda (
         sda = trained_sda,
         test_seq_len = test_seq_len
@@ -200,7 +196,7 @@ def train_sda_with_log_layer():
     f.write('max value of error: %f\n' % numpy.round(numpy.amax(test_errors), 6))
     f.close()
     os.chdir('../')
-    '''
+    
     os.chdir('../')
 
 

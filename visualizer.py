@@ -116,45 +116,40 @@ def visualize_pretraining(train_cost,
         os.chdir('../')
         os.chdir('../')
         
-def visualize_finetuning(train_cost, train_error, valid_error, 
-                    window_size, learning_rate, datasets_folder, base_folder):
+def visualize_finetuning(train_cost, train_error, 
+                         learning_rate, batch_size,
+                         base_folder):
         if not os.path.isdir(base_folder):
             os.makedirs(base_folder)
         os.chdir(base_folder)
         
-        if not os.path.isdir(datasets_folder):
-            os.makedirs(datasets_folder)
-        os.chdir(datasets_folder)
-        
-        example_folder = ('WS %f')%(window_size)
-        if not os.path.isdir(example_folder):
-            os.makedirs(example_folder)
-        os.chdir(example_folder)
-                                                                
+        output_folder = 'vis_finetuning'
+        if not os.path.isdir(output_folder):
+            os.makedirs(output_folder)
+        os.chdir(output_folder)
+                                                                                
         train_cost=numpy.asarray(train_cost)
         train_error=numpy.asarray(train_error)
-        valid_error=numpy.asarray(valid_error)
                 
         # print errors
         plt.figure(1)
         plt.plot(train_error[:, 0],train_error[:,1],label='train_error')
-        plt.plot(valid_error[:, 0],valid_error[:,1],label='valid_error')
         
         # decorative part       
         plt.xlabel('epochs')
         plt.ylabel('error(%)')
         if learning_rate<=0:
             plt.title(
-                ('WS: %i')
-                % (window_size)
+                ('BS: %i')
+                % (batch_size)
             )
-            plot_name = ('error WS %i.png')%(window_size)
+            plot_name = ('error WS %i.png')%(batch_size)
         else:
             plt.title(
-                ('WS: %i  LR: %f')
-                % (window_size, learning_rate)
+                ('BS: %i  LR: %f')
+                % (batch_size, learning_rate)
             )
-            plot_name = ('error LR %f WS %i.png')%(learning_rate, window_size)
+            plot_name = ('error LR %f BS %i.png')%(learning_rate, batch_size)
         plt.legend(loc='upper left')
         plt.savefig(plot_name, dpi=200)
         plt.close()
@@ -168,23 +163,22 @@ def visualize_finetuning(train_cost, train_error, valid_error,
         plt.ylabel('cost')
         if learning_rate<=0:
             plt.title(
-                ('Window size: %i')
-                % (window_size)
+                ('Batch size: %i')
+                % (batch_size)
             )
-            plot_name = ('cost WS %i.png')%(window_size)
+            plot_name = ('cost BS %i.png')%(batch_size)
         else:
             plt.title(
-                ('Window size: %i  Learning rate: %f')
-                % (window_size, learning_rate)
+                ('Batch size: %i  Learning rate: %f')
+                % (batch_size, learning_rate)
             )
-            plot_name = ('cost LR %f WS %i.png')%(learning_rate, window_size)
+            plot_name = ('cost LR %f BS %i.png')%(learning_rate, batch_size)
 
         plt.legend(loc='upper right')
         plt.savefig(plot_name, dpi=200)                    
         plt.clf()
         plt.close()
         
-        os.chdir('../')
         os.chdir('../')
         os.chdir('../')
         

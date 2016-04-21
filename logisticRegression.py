@@ -80,6 +80,8 @@ class LogisticRegression(object):
         self.train_error_array = []
         self.epoch = 0
         self.validation = numpy.inf
+        self.best_cost = numpy.inf
+        self.best_error = numpy.inf
         
     def negative_log_likelihood(self, y):
         '''
